@@ -13,6 +13,9 @@ import sympy as sp
 import math
 import json
 import os
+import itertools
+import asyncio
+
 
 # ================= CONFIG =================
 TOKEN = os.getenv("TOKEN")
@@ -268,10 +271,27 @@ async def ui(ctx):
 
 
 # ================= READY =================
+
+async def status_loop():
+    statuses = itertools.cycle([
+        discord.Activity(type=discord.ActivityType.watching, name="math problems"),
+        discord.Activity(type=discord.ActivityType.playing, name="with equations"),
+        discord.Activity(type=discord.ActivityType.listening, name="!help | /help"),
+        discord.Activity(type=discord.ActivityType.watching, name="integrals & derivatives"),
+    ])
+
+    await bot.wait_until_ready()
+
+    while not bot.is_closed():
+        await bot.change_presence(activity=next(statuses))
+        await asyncio.sleep(30)  # change every 30 seconds
+
 @bot.event
 async def on_ready():
     await bot.tree.sync()
+    bot.loop.create_task(status_loop())
     print(f"Logged in as {bot.user}")
+
 
 if not TOKEN:
     raise RuntimeError("TOKEN environment variable not set")
