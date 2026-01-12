@@ -104,6 +104,58 @@ class CalculatorView(discord.ui.View):
     @discord.ui.button(label="C", style=discord.ButtonStyle.danger)
     async def clear(self, interaction, button): self.expression = ""; await self.update(interaction)
 
+# ================= HELP =================
+def help_embed():
+    embed = discord.Embed(
+        title="📘 Numexa — Help",
+        description="A powerful scientific calculator & math bot",
+        color=0x8A2BE2
+    )
+
+    embed.add_field(
+        name="🧮 Calculator",
+        value=(
+            "`!calc <expression>`\n"
+            "`/calc <expression>`\n"
+            "**Examples:**\n"
+            "`!calc 2+2`\n"
+            "`!calc sin(30)`"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📐 Calculus",
+        value=(
+            "`!diff <expression>` — Differentiation\n"
+            "`!integrate <expression>` — Integration\n"
+            "`!dsolve <equation>` — Differential equations\n\n"
+            "**Example:**\n"
+            "`!diff x^2 + 3x`"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="⚙️ Settings",
+        value=(
+            "`!angle deg` / `!angle rad`\n"
+            "`!setprefix <prefix>` (Admin)\n"
+            "`!noprefix @user` (Owner only)"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🖥️ UI Calculator",
+        value="`!ui` — Open interactive calculator",
+        inline=False
+    )
+
+    embed.set_footer(text="Numexa • Scientific Discord Calculator")
+    return embed
+
+
 # ================= PREFIX COMMANDS =================
 @bot.command()
 async def calc(ctx, *, expression: str):
@@ -134,6 +186,11 @@ async def dsolve(ctx, *, equation: str):
     except:
         await ctx.send("Invalid differential equation")
 
+@bot.command(name="help")
+async def help_command(ctx):
+    await ctx.send(embed=help_embed())
+
+
 # ================= SLASH COMMANDS =================
 @bot.tree.command(name="calc")
 async def slash_calc(interaction: discord.Interaction, expression: str):
@@ -162,6 +219,10 @@ async def slash_dsolve(interaction: discord.Interaction, equation: str):
         await interaction.response.send_message(f"Solution: **{sp.dsolve(sp.sympify(equation))}**")
     except:
         await interaction.response.send_message("Invalid differential equation")
+
+@bot.tree.command(name="help", description="Show all Numexa commands")
+async def slash_help(interaction: discord.Interaction):
+    await interaction.response.send_message(embed=help_embed(), ephemeral=True)
 
 # ================= SETTINGS =================
 @bot.command()
@@ -204,10 +265,16 @@ async def removeprefixaccess(ctx, member: discord.Member):
 async def ui(ctx):
     await ctx.send("Calculator", view=CalculatorView(ctx.author.id))
 
+
+
 # ================= READY =================
 @bot.event
 async def on_ready():
     await bot.tree.sync()
     print(f"Logged in as {bot.user}")
+
+if not TOKEN:
+    raise RuntimeError("TOKEN environment variable not set")
+
 
 bot.run(TOKEN)
