@@ -1,4 +1,4 @@
-# Discord Calculator Bot 
+# Discord Calculator Bot — Numexa
 # Features:
 # - Custom prefix (persistent, per server)
 # - No-prefix users (persistent, owner controlled)
@@ -6,6 +6,7 @@
 # - UI using Discord Buttons
 # - DEG / RAD angle switch (persistent)
 # - Scientific, calculus & differential equations
+# - Server-based counting channel system (admin configurable)
 
 import discord
 from discord.ext import commands
@@ -16,19 +17,22 @@ import os
 import itertools
 import asyncio
 
-
 # ================= CONFIG =================
 TOKEN = os.getenv("TOKEN")
 OWNER_ID = 800553680704110624
 EXTRA_OWNERS = {111111111111111111}
 DEFAULT_PREFIX = "!"
-
 DATA_FILE = "bot_data.json"
 
 # ================= DATA STORAGE =================
 def load_data():
     if not os.path.exists(DATA_FILE):
-        return {"prefixes": {}, "noprefix": [], "angle": {}}
+        return {
+            "prefixes": {},
+            "noprefix": [],
+            "angle": {},
+            "counting": {}
+        }
     with open(DATA_FILE, "r") as f:
         return json.load(f)
 
@@ -36,11 +40,14 @@ def save_data():
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-# Load persistent data
 data = load_data()
-custom_prefixes = {int(k): v for k, v in data["prefixes"].items()}
-no_prefix_users = set(data["noprefix"])
-angle_mode = {int(k): v for k, v in data["angle"].items()}
+
+custom_prefixes = {int(k): v for k, v in data.get("prefixes", {}).items()}
+no_prefix_users = set(data.get("noprefix", []))
+angle_mode = {int(k): v for k, v in data.get("angle", {}).items()}
+
+if "counting" not in data:
+    data["counting"] = {}
 
 # ================= PREFIX HANDLER =================
 def get_prefix(bot, message):
@@ -50,33 +57,33 @@ def get_prefix(bot, message):
 
 intents = discord.Intents.default()
 intents.message_content = True
+
 bot = commands.Bot(
     command_prefix=get_prefix,
     intents=intents,
-    help_command=None  # ← IMPORTANT
+    help_command=None
 )
 
-
-x = sp.symbols('x')
+x = sp.symbols("x")
 
 # ================= SAFE EVAL =================
 def safe_eval(expr: str, user_id=None):
-    expr = expr.replace('^', '**').replace('π', 'pi')
-    mode = angle_mode.get(user_id, 'rad')
+    expr = expr.replace("^", "**").replace("π", "pi")
+    mode = angle_mode.get(user_id, "rad")
 
-    def sin(v): return math.sin(math.radians(v)) if mode == 'deg' else math.sin(v)
-    def cos(v): return math.cos(math.radians(v)) if mode == 'deg' else math.cos(v)
-    def tan(v): return math.tan(math.radians(v)) if mode == 'deg' else math.tan(v)
+    def sin(v): return math.sin(math.radians(v)) if mode == "deg" else math.sin(v)
+    def cos(v): return math.cos(math.radians(v)) if mode == "deg" else math.cos(v)
+    def tan(v): return math.tan(math.radians(v)) if mode == "deg" else math.tan(v)
 
     return eval(expr, {"__builtins__": None}, {
-        'sin': sin,
-        'cos': cos,
-        'tan': tan,
-        'log': math.log10,
-        'ln': math.log,
-        'sqrt': math.sqrt,
-        'pi': math.pi,
-        'e': math.e
+        "sin": sin,
+        "cos": cos,
+        "tan": tan,
+        "log": math.log10,
+        "ln": math.log,
+        "sqrt": math.sqrt,
+        "pi": math.pi,
+        "e": math.e
     })
 
 # ================= UI =================
@@ -87,209 +94,170 @@ class CalculatorView(discord.ui.View):
         self.user_id = user_id
 
     async def update(self, interaction):
-        await interaction.response.edit_message(content=f"```{self.expression}```", view=self)
+        await interaction.response.edit_message(
+            content=f"```{self.expression}```",
+            view=self
+        )
 
     @discord.ui.button(label="7", style=discord.ButtonStyle.secondary)
-    async def seven(self, interaction, button): self.expression += "7"; await self.update(interaction)
+    async def seven(self, i, b): self.expression += "7"; await self.update(i)
 
     @discord.ui.button(label="8", style=discord.ButtonStyle.secondary)
-    async def eight(self, interaction, button): self.expression += "8"; await self.update(interaction)
+    async def eight(self, i, b): self.expression += "8"; await self.update(i)
 
     @discord.ui.button(label="9", style=discord.ButtonStyle.secondary)
-    async def nine(self, interaction, button): self.expression += "9"; await self.update(interaction)
+    async def nine(self, i, b): self.expression += "9"; await self.update(i)
 
     @discord.ui.button(label="+", style=discord.ButtonStyle.primary)
-    async def add(self, interaction, button): self.expression += "+"; await self.update(interaction)
+    async def add(self, i, b): self.expression += "+"; await self.update(i)
 
     @discord.ui.button(label="=", style=discord.ButtonStyle.success)
-    async def equal(self, interaction, button):
+    async def equal(self, i, b):
         try:
             self.expression = str(safe_eval(self.expression, self.user_id))
         except:
             self.expression = "Error"
-        await self.update(interaction)
+        await self.update(i)
 
     @discord.ui.button(label="C", style=discord.ButtonStyle.danger)
-    async def clear(self, interaction, button): self.expression = ""; await self.update(interaction)
+    async def clear(self, i, b): self.expression = ""; await self.update(i)
 
 # ================= HELP =================
 def help_embed():
     embed = discord.Embed(
         title="📘 Numexa — Help",
-        description="A powerful scientific calculator & math bot",
+        description="Scientific calculator & math utility bot",
         color=0x8A2BE2
     )
 
     embed.add_field(
         name="🧮 Calculator",
-        value=(
-            "`!calc <expression>`\n"
-            "`/calc <expression>`\n"
-            "**Examples:**\n"
-            "`!calc 2+2`\n"
-            "`!calc sin(30)`"
-        ),
+        value="`!calc`, `/calc`",
         inline=False
     )
 
     embed.add_field(
         name="📐 Calculus",
+        value="`!diff`, `!integrate`, `!dsolve`",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🔢 Counting System",
         value=(
-            "`!diff <expression>` — Differentiation\n"
-            "`!integrate <expression>` — Integration\n"
-            "`!dsolve <equation>` — Differential equations\n\n"
-            "**Example:**\n"
-            "`!diff x^2 + 3x`"
+            "`!setcount` (Admin)\n"
+            "`!resetcount` (Admin)\n"
+            "Count numbers in a channel starting from **0**"
         ),
         inline=False
     )
 
     embed.add_field(
-        name="⚙️ Settings",
-        value=(
-            "`!angle deg` / `!angle rad`\n"
-            "`!setprefix <prefix>` (Admin)\n"
-            "`!noprefix @user` (Owner only)"
-        ),
+        name="🖥 UI",
+        value="`!ui`",
         inline=False
     )
 
-    embed.add_field(
-        name="🖥️ UI Calculator",
-        value="`!ui` — Open interactive calculator",
-        inline=False
-    )
-
-    embed.set_footer(text="Numexa • Scientific Discord Calculator")
+    embed.set_footer(text="Numexa • Scientific Discord Bot")
     return embed
-
 
 # ================= PREFIX COMMANDS =================
 @bot.command()
-async def calc(ctx, *, expression: str):
+async def calc(ctx, *, expr: str):
     try:
-        await ctx.send(f"Result: **{safe_eval(expression, ctx.author.id)}**")
+        await ctx.send(f"**Result:** {safe_eval(expr, ctx.author.id)}")
     except:
-        await ctx.send("Invalid expression")
+        await ctx.send("❌ Invalid expression")
 
 @bot.command()
-async def diff(ctx, *, expression: str):
+async def diff(ctx, *, expr: str):
     try:
-        await ctx.send(f"d/dx: **{sp.diff(sp.sympify(expression), x)}**")
+        await ctx.send(f"**d/dx:** {sp.diff(sp.sympify(expr), x)}")
     except:
-        await ctx.send("Invalid expression")
+        await ctx.send("❌ Invalid expression")
 
 @bot.command()
-async def integrate(ctx, *, expression: str):
+async def integrate(ctx, *, expr: str):
     try:
-        await ctx.send(f"∫dx: **{sp.integrate(sp.sympify(expression), x)} + C**")
+        await ctx.send(f"**∫dx:** {sp.integrate(sp.sympify(expr), x)} + C")
     except:
-        await ctx.send("Invalid expression")
+        await ctx.send("❌ Invalid expression")
 
 @bot.command()
-async def dsolve(ctx, *, equation: str):
+async def dsolve(ctx, *, eq: str):
     try:
-        eq = sp.sympify(equation)
-        await ctx.send(f"Solution: **{sp.dsolve(eq)}**")
+        await ctx.send(f"**Solution:** {sp.dsolve(sp.sympify(eq))}")
     except:
-        await ctx.send("Invalid differential equation")
+        await ctx.send("❌ Invalid equation")
 
 @bot.command(name="help")
-async def help_command(ctx):
+async def help_cmd(ctx):
     await ctx.send(embed=help_embed())
 
-
-# ================= SLASH COMMANDS =================
-@bot.tree.command(name="calc")
-async def slash_calc(interaction: discord.Interaction, expression: str):
-    try:
-        await interaction.response.send_message(f"Result: **{safe_eval(expression, interaction.user.id)}**")
-    except:
-        await interaction.response.send_message("Invalid expression")
-
-@bot.tree.command(name="diff")
-async def slash_diff(interaction: discord.Interaction, expression: str):
-    try:
-        await interaction.response.send_message(f"d/dx: **{sp.diff(sp.sympify(expression), x)}**")
-    except:
-        await interaction.response.send_message("Invalid expression")
-
-@bot.tree.command(name="integrate")
-async def slash_integrate(interaction: discord.Interaction, expression: str):
-    try:
-        await interaction.response.send_message(f"∫dx: **{sp.integrate(sp.sympify(expression), x)} + C**")
-    except:
-        await interaction.response.send_message("Invalid expression")
-
-@bot.tree.command(name="dsolve")
-async def slash_dsolve(interaction: discord.Interaction, equation: str):
-    try:
-        await interaction.response.send_message(f"Solution: **{sp.dsolve(sp.sympify(equation))}**")
-    except:
-        await interaction.response.send_message("Invalid differential equation")
-
-@bot.tree.command(name="help", description="Show all Numexa commands")
-async def slash_help(interaction: discord.Interaction):
-    await interaction.response.send_message(embed=help_embed(), ephemeral=True)
-
-# ================= SETTINGS =================
 @bot.command()
-async def angle(ctx, mode: str):
-    if mode.lower() not in ('deg', 'rad'):
-        return await ctx.send("Use deg or rad")
-    angle_mode[ctx.author.id] = mode.lower()
-    data['angle'][str(ctx.author.id)] = mode.lower()
+@commands.has_permissions(administrator=True)
+async def setcount(ctx):
+    gid = str(ctx.guild.id)
+    data["counting"][gid] = {
+        "channel": ctx.channel.id,
+        "current": 0
+    }
     save_data()
-    await ctx.send(f"Angle mode set to **{mode.upper()}**")
+    await ctx.send(f"✅ Counting channel set to {ctx.channel.mention}")
 
 @bot.command()
-async def setprefix(ctx, prefix: str):
-    if not ctx.author.guild_permissions.administrator:
-        return await ctx.send("Admin only")
-    custom_prefixes[ctx.guild.id] = prefix
-    data['prefixes'][str(ctx.guild.id)] = prefix
-    save_data()
-    await ctx.send(f"Prefix set to `{prefix}`")
-
-@bot.command()
-async def noprefix(ctx, member: discord.Member):
-    if ctx.author.id not in {OWNER_ID} | EXTRA_OWNERS:
-        return await ctx.send("Owner only")
-    no_prefix_users.add(member.id)
-    data['noprefix'] = list(no_prefix_users)
-    save_data()
-    await ctx.send(f"No-prefix enabled for {member.mention}")
-
-@bot.command()
-async def removeprefixaccess(ctx, member: discord.Member):
-    if ctx.author.id not in {OWNER_ID} | EXTRA_OWNERS:
-        return await ctx.send("Owner only")
-    no_prefix_users.discard(member.id)
-    data['noprefix'] = list(no_prefix_users)
-    save_data()
-    await ctx.send(f"No-prefix removed for {member.mention}")
+@commands.has_permissions(administrator=True)
+async def resetcount(ctx):
+    gid = str(ctx.guild.id)
+    if gid in data["counting"]:
+        data["counting"][gid]["current"] = 0
+        save_data()
+        await ctx.send("🔄 Count reset to **0**")
 
 @bot.command()
 async def ui(ctx):
     await ctx.send("Calculator", view=CalculatorView(ctx.author.id))
 
+# ================= SLASH HELP =================
+@bot.tree.command(name="help")
+async def slash_help(interaction: discord.Interaction):
+    await interaction.response.send_message(embed=help_embed(), ephemeral=True)
 
+# ================= COUNTING LOGIC =================
+@bot.event
+async def on_message(message):
+    if message.author.bot or not message.guild:
+        return
 
-# ================= READY =================
+    gid = str(message.guild.id)
+    counting = data["counting"].get(gid)
 
+    if counting and message.channel.id == counting["channel"]:
+        content = message.content.strip()
+
+        if not content.isdigit() or int(content) != counting["current"]:
+            counting["current"] = 0
+            save_data()
+            await message.reply("❌ Wrong number! Count reset to **0**.")
+            return
+
+        counting["current"] += 1
+        save_data()
+
+    await bot.process_commands(message)
+
+# ================= STATUS =================
 async def status_loop():
     statuses = itertools.cycle([
         discord.Activity(type=discord.ActivityType.watching, name="math problems"),
         discord.Activity(type=discord.ActivityType.playing, name="with equations"),
         discord.Activity(type=discord.ActivityType.listening, name="!help | /help"),
-        discord.Activity(type=discord.ActivityType.watching, name="integrals & derivatives"),
     ])
 
     await bot.wait_until_ready()
-
     while not bot.is_closed():
         await bot.change_presence(activity=next(statuses))
-        await asyncio.sleep(30)  # change every 30 seconds
+        await asyncio.sleep(30)
 
 @bot.event
 async def on_ready():
@@ -297,9 +265,7 @@ async def on_ready():
     bot.loop.create_task(status_loop())
     print(f"Logged in as {bot.user}")
 
-
 if not TOKEN:
     raise RuntimeError("TOKEN environment variable not set")
-
 
 bot.run(TOKEN)
