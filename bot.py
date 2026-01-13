@@ -25,7 +25,7 @@ DEFAULT_PREFIX = "!"
 DATA_FILE = "bot_data.json"
 CHECK_EMOJI_ID = 1460663385472503874
 CROSS_EMOJI_ID = 1460663471623504185
-
+DEVZONE_INVITE = "https://discord.gg/SmSx4uvVCD"
 
 # ================= DATA STORAGE =================
 def load_data():
@@ -98,32 +98,81 @@ class CalculatorView(discord.ui.View):
 
     async def update(self, interaction):
         await interaction.response.edit_message(
-            content=f"```{self.expression}```",
+            content=f"```{self.expression or '0'}```",
             view=self
         )
 
-    @discord.ui.button(label="7", style=discord.ButtonStyle.secondary)
-    async def seven(self, i, b): self.expression += "7"; await self.update(i)
+    # -------- Numbers --------
+    @discord.ui.button(label="7", style=discord.ButtonStyle.secondary, row=0)
+    async def b7(self, i, b): self.expression += "7"; await self.update(i)
 
-    @discord.ui.button(label="8", style=discord.ButtonStyle.secondary)
-    async def eight(self, i, b): self.expression += "8"; await self.update(i)
+    @discord.ui.button(label="8", style=discord.ButtonStyle.secondary, row=0)
+    async def b8(self, i, b): self.expression += "8"; await self.update(i)
 
-    @discord.ui.button(label="9", style=discord.ButtonStyle.secondary)
-    async def nine(self, i, b): self.expression += "9"; await self.update(i)
+    @discord.ui.button(label="9", style=discord.ButtonStyle.secondary, row=0)
+    async def b9(self, i, b): self.expression += "9"; await self.update(i)
 
-    @discord.ui.button(label="+", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="÷", style=discord.ButtonStyle.primary, row=0)
+    async def div(self, i, b): self.expression += "/"; await self.update(i)
+
+    # -------- Row 2 --------
+    @discord.ui.button(label="4", style=discord.ButtonStyle.secondary, row=1)
+    async def b4(self, i, b): self.expression += "4"; await self.update(i)
+
+    @discord.ui.button(label="5", style=discord.ButtonStyle.secondary, row=1)
+    async def b5(self, i, b): self.expression += "5"; await self.update(i)
+
+    @discord.ui.button(label="6", style=discord.ButtonStyle.secondary, row=1)
+    async def b6(self, i, b): self.expression += "6"; await self.update(i)
+
+    @discord.ui.button(label="×", style=discord.ButtonStyle.primary, row=1)
+    async def mul(self, i, b): self.expression += "*"; await self.update(i)
+
+    # -------- Row 3 --------
+    @discord.ui.button(label="1", style=discord.ButtonStyle.secondary, row=2)
+    async def b1(self, i, b): self.expression += "1"; await self.update(i)
+
+    @discord.ui.button(label="2", style=discord.ButtonStyle.secondary, row=2)
+    async def b2(self, i, b): self.expression += "2"; await self.update(i)
+
+    @discord.ui.button(label="3", style=discord.ButtonStyle.secondary, row=2)
+    async def b3(self, i, b): self.expression += "3"; await self.update(i)
+
+    @discord.ui.button(label="−", style=discord.ButtonStyle.primary, row=2)
+    async def sub(self, i, b): self.expression += "-"; await self.update(i)
+
+    # -------- Row 4 --------
+    @discord.ui.button(label="0", style=discord.ButtonStyle.secondary, row=3)
+    async def b0(self, i, b): self.expression += "0"; await self.update(i)
+
+    @discord.ui.button(label=".", style=discord.ButtonStyle.secondary, row=3)
+    async def dot(self, i, b): self.expression += "."; await self.update(i)
+
+    @discord.ui.button(label="C", style=discord.ButtonStyle.danger, row=3)
+    async def clear(self, i, b):
+        self.expression = ""
+        await self.update(i)
+
+    @discord.ui.button(label="+", style=discord.ButtonStyle.primary, row=3)
     async def add(self, i, b): self.expression += "+"; await self.update(i)
 
-    @discord.ui.button(label="=", style=discord.ButtonStyle.success)
-    async def equal(self, i, b):
+    # -------- Row 5 --------
+    @discord.ui.button(label="sin", style=discord.ButtonStyle.secondary, row=4)
+    async def sin(self, i, b): self.expression += "sin("; await self.update(i)
+
+    @discord.ui.button(label="cos", style=discord.ButtonStyle.secondary, row=4)
+    async def cos(self, i, b): self.expression += "cos("; await self.update(i)
+
+    @discord.ui.button(label="tan", style=discord.ButtonStyle.secondary, row=4)
+    async def tan(self, i, b): self.expression += "tan("; await self.update(i)
+
+    @discord.ui.button(label="=", style=discord.ButtonStyle.success, row=4)
+    async def equals(self, i, b):
         try:
             self.expression = str(safe_eval(self.expression, self.user_id))
         except:
             self.expression = "Error"
         await self.update(i)
-
-    @discord.ui.button(label="C", style=discord.ButtonStyle.danger)
-    async def clear(self, i, b): self.expression = ""; await self.update(i)
 
 # ================= HELP =================
 def help_embed():
@@ -220,6 +269,60 @@ async def resetcount(ctx):
 @bot.command()
 async def ui(ctx):
     await ctx.send("Calculator", view=CalculatorView(ctx.author.id))
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def dmuser(ctx, member: discord.Member, *, message: str):
+    try:
+        embed = discord.Embed(
+            title="📩 Message from a server admin",
+            description=message,
+            color=0x8A2BE2
+        )
+
+        embed.set_footer(
+            text=f"Sent via Numexa • From {ctx.guild.name}"
+        )
+
+        await member.send(embed=embed)
+        await ctx.send(f"✅ Message sent to {member.mention}")
+
+    except discord.Forbidden:
+        await ctx.send("❌ Cannot send DM. User has DMs closed.")
+
+
+@bot.event
+async def on_guild_join(guild):
+    try:
+        owner = guild.owner
+        if owner is None:
+            return
+
+        embed = discord.Embed(
+            title="👋 Thanks for adding Numexa!",
+            description=(
+                "Thank you for inviting **Numexa** to your server 🎉\n\n"
+                "🧮 Numexa helps with calculations, calculus, and a counting system.\n"
+                "⚙️ Use `!help` or `/help` to get started.\n\n"
+                "💬 **Join The Devzone** (support & updates):"
+            ),
+            color=0x8A2BE2
+        )
+
+        embed.add_field(
+            name="🔗 Support Server",
+            value=f"[Join The Devzone]({DEVZONE_INVITE})",
+            inline=False
+        )
+
+        embed.set_footer(text="Numexa • Scientific Discord Bot")
+
+        await owner.send(embed=embed)
+
+    except discord.Forbidden:
+        # Owner has DMs closed
+        pass
+
 
 # ================= SLASH HELP =================
 @bot.tree.command(name="help")
