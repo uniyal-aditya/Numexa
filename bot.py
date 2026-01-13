@@ -23,6 +23,9 @@ OWNER_ID = 800553680704110624
 EXTRA_OWNERS = {111111111111111111}
 DEFAULT_PREFIX = "!"
 DATA_FILE = "bot_data.json"
+CHECK_EMOJI_ID = 1460663385472503874
+CROSS_EMOJI_ID = 1460663471623504185
+
 
 # ================= DATA STORAGE =================
 def load_data():
@@ -235,16 +238,45 @@ async def on_message(message):
     if counting and message.channel.id == counting["channel"]:
         content = message.content.strip()
 
-        if not content.isdigit() or int(content) != counting["current"]:
+        check_emoji = bot.get_emoji(CHECK_EMOJI_ID)
+        cross_emoji = bot.get_emoji(CROSS_EMOJI_ID) if CROSS_EMOJI_ID else "❌"
+
+        # Must be a number
+        if not content.isdigit():
             counting["current"] = 0
+            counting["last_user"] = None
             save_data()
-            await message.reply("❌ Wrong number! Count reset to **0**.")
+            await message.add_reaction(cross_emoji)
             return
 
+        number = int(content)
+
+        # Prevent same user twice
+        if counting.get("last_user") == message.author.id:
+            counting["current"] = 0
+            counting["last_user"] = None
+            save_data()
+            await message.add_reaction(cross_emoji)
+            return
+
+        # Wrong number
+        if number != counting["current"]:
+            counting["current"] = 0
+            counting["last_user"] = None
+            save_data()
+            await message.add_reaction(cross_emoji)
+            return
+
+        # Correct number
         counting["current"] += 1
+        counting["last_user"] = message.author.id
         save_data()
 
+        if check_emoji:
+            await message.add_reaction(check_emoji)
+
     await bot.process_commands(message)
+
 
 # ================= STATUS =================
 async def status_loop():
