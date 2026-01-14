@@ -341,8 +341,9 @@ async def on_message(message):
     if counting and message.channel.id == counting["channel"]:
         content = message.content.strip()
 
-        check_emoji = bot.get_emoji(CHECK_EMOJI_ID)
-        cross_emoji = bot.get_emoji(CROSS_EMOJI_ID) if CROSS_EMOJI_ID else "❌"
+        # ✅ Application emojis (Developer Portal)
+        check_emoji = f"<:checkmark:{CHECK_EMOJI_ID}>"
+        cross_emoji = f"<:wrong:{CROSS_EMOJI_ID}>"
 
         # Must be a number
         if not content.isdigit():
@@ -375,8 +376,7 @@ async def on_message(message):
         counting["last_user"] = message.author.id
         save_data()
 
-        if check_emoji:
-            await message.add_reaction(check_emoji)
+        await message.add_reaction(check_emoji)
 
     await bot.process_commands(message)
 
