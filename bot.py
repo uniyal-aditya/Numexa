@@ -23,8 +23,9 @@ OWNER_ID = 800553680704110624
 EXTRA_OWNERS = {111111111111111111}
 DEFAULT_PREFIX = "!"
 DATA_FILE = "bot_data.json"
-CHECK_EMOJI_ID = 1460663385472503874
-CROSS_EMOJI_ID = 1460663471623504185
+CHECK_EMOJI = "<:right:1460663385472503874>"
+CROSS_EMOJI = "<:wrong:1460663471623504185"
+
 DEVZONE_INVITE = "https://discord.gg/SmSx4uvVCD"
 
 # ================= DATA STORAGE =================
@@ -44,6 +45,9 @@ def save_data():
         json.dump(data, f, indent=4)
 
 data = load_data()
+
+if not os.path.exists(DATA_FILE):
+    save_data()
 
 custom_prefixes = {int(k): v for k, v in data.get("prefixes", {}).items()}
 no_prefix_users = set(data.get("noprefix", []))
@@ -342,7 +346,7 @@ async def on_message(message):
         content = message.content.strip()
 
         check_emoji = bot.get_emoji(CHECK_EMOJI_ID)
-        cross_emoji = bot.get_emoji(CROSS_EMOJI_ID) if CROSS_EMOJI_ID else "❌"
+        cross_emoji = bot.get_emoji(CROSS_EMOJI_ID) or "❌"
 
         # Must be a number
         if not content.isdigit():
@@ -354,7 +358,7 @@ async def on_message(message):
 
         number = int(content)
 
-        # Prevent same user twice
+        # ❗ Only block if SAME USER sends twice in a row
         if counting.get("last_user") == message.author.id:
             counting["current"] = 0
             counting["last_user"] = None
@@ -362,7 +366,7 @@ async def on_message(message):
             await message.add_reaction(cross_emoji)
             return
 
-        # Wrong number
+        # ❗ Wrong number
         if number != counting["current"]:
             counting["current"] = 0
             counting["last_user"] = None
@@ -370,7 +374,7 @@ async def on_message(message):
             await message.add_reaction(cross_emoji)
             return
 
-        # Correct number
+        # ✅ Correct number
         counting["current"] += 1
         counting["last_user"] = message.author.id
         save_data()
