@@ -177,36 +177,32 @@ class CalculatorView(discord.ui.View):
 # ================= HELP =================
 def help_embed():
     embed = discord.Embed(
-        title="📘 Numexa — Help",
-        description="Scientific calculator & math utility bot",
+        title="📘 Numexa — Help Menu",
+        description="Prefix (`!`) and Slash (`/`) commands supported",
         color=0x8A2BE2
     )
 
     embed.add_field(
         name="🧮 Calculator",
-        value="`!calc`, `/calc`",
+        value="`!calc`, `/calc`\n`!ui`, `/ui`",
         inline=False
     )
 
     embed.add_field(
         name="📐 Calculus",
-        value="`!diff`, `!integrate`, `!dsolve`",
+        value="`!diff`, `/diff`\n`!integrate`, `/integrate`\n`!dsolve`, `/dsolve`",
         inline=False
     )
 
     embed.add_field(
-        name="🔢 Counting System",
-        value=(
-            "`!setcount` (Admin)\n"
-            "`!resetcount` (Admin)\n"
-            "Count numbers in a channel starting from **0**"
-        ),
+        name="🔢 Counting",
+        value="`!setcount`, `/setcount`\n`!resetcount`, `/resetcount`",
         inline=False
     )
 
     embed.add_field(
-        name="🖥 UI",
-        value="`!ui`",
+        name="🔗 Links",
+        value="`!inv`, `/invite`\n`!support`, `/support`\n`!dashboard`, `/dashboard`",
         inline=False
     )
 
@@ -245,6 +241,65 @@ async def dsolve(ctx, *, eq: str):
 @bot.command(name="help")
 async def help_cmd(ctx):
     await ctx.send(embed=help_embed())
+
+@bot.command()
+async def support(ctx):
+    embed = discord.Embed(
+        title="💬 Need Help or Updates?",
+        description="Join our official support server **Devzone** for help, updates, and announcements.",
+        color=0x8A2BE2
+    )
+
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(
+            label="Join Devzone",
+            style=discord.ButtonStyle.link,
+            url="https://discord.gg/SmSx4uvVCD"
+        )
+    )
+
+    await ctx.send(embed=embed, view=view)
+
+@bot.command()
+async def dashboard(ctx):
+    embed = discord.Embed(
+        title="🧠 Numexa Dashboard",
+        description="Manage settings, view stats, and configure Numexa from the dashboard.",
+        color=0x8A2BE2
+    )
+
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(
+            label="Open Dashboard",
+            style=discord.ButtonStyle.link,
+            url="https://numexa.netlify.app"
+        )
+    )
+
+    await ctx.send(embed=embed, view=view)
+
+
+@bot.command(aliases=["invite", "inv"])
+async def inv(ctx):
+    embed = discord.Embed(
+        title="👋 Hi! I'm Numexa",
+        description="Click the button below to invite me to your server.",
+        color=0x8A2BE2
+    )
+
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(
+            label="Add Numexa",
+            style=discord.ButtonStyle.link,
+            url=" https://discord.com/oauth2/authorize?client_id=1460289617264775333&permissions=5629501681765440&scope=bot+applications.commands"
+        )
+    )
+
+    await ctx.send(embed=embed, view=view)
+
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -324,10 +379,58 @@ async def on_guild_join(guild):
         pass
 
 
-# ================= SLASH HELP =================
+# ================= SLASH COMMANDS =================
 @bot.tree.command(name="help")
-async def slash_help(interaction: discord.Interaction):
-    await interaction.response.send_message(embed=help_embed(), ephemeral=True)
+async def slash_help(i: discord.Interaction):
+    await i.response.send_message(embed=help_embed(), ephemeral=True)
+
+@bot.tree.command(name="calc")
+async def slash_calc(i: discord.Interaction, expr: str):
+    await i.response.send_message(f"**Result:** {safe_eval(expr, i.user.id)}")
+
+@bot.tree.command(name="diff")
+async def slash_diff(i: discord.Interaction, expr: str):
+    await i.response.send_message(f"**d/dx:** {sp.diff(sp.sympify(expr), x)}")
+
+@bot.tree.command(name="integrate")
+async def slash_integrate(i: discord.Interaction, expr: str):
+    await i.response.send_message(f"**∫dx:** {sp.integrate(sp.sympify(expr), x)} + C")
+
+@bot.tree.command(name="dsolve")
+async def slash_dsolve(i: discord.Interaction, eq: str):
+    await i.response.send_message(f"**Solution:** {sp.dsolve(sp.sympify(eq))}")
+
+@bot.tree.command(name="invite")
+async def slash_invite(i: discord.Interaction):
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="Add Numexa", url=INVITE_URL))
+    await i.response.send_message(embed=discord.Embed(title="👋 Hi! I'm Numexa", color=0x8A2BE2), view=view, ephemeral=True)
+
+@bot.tree.command(name="support")
+async def slash_support(i: discord.Interaction):
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="Join Devzone", url=DEVZONE_INVITE))
+    await i.response.send_message(embed=discord.Embed(title="💬 Support Server", color=0x8A2BE2), view=view, ephemeral=True)
+
+@bot.tree.command(name="dashboard")
+async def slash_dashboard(i: discord.Interaction):
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="Open Dashboard", url=DASHBOARD_URL))
+    await i.response.send_message(embed=discord.Embed(title="🧠 Dashboard", color=0x8A2BE2), view=view, ephemeral=True)
+
+# ================= STATUS =================
+async def status_loop():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="/help | !help"))
+        await asyncio.sleep(30)
+
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    bot.loop.create_task(status_loop())
+    print(f"Logged in as {bot.user}")
+
 
 # ================= COUNTING LOGIC =================
 @bot.event
