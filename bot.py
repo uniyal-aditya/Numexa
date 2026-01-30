@@ -26,6 +26,9 @@ DATA_FILE = "bot_data.json"
 CHECK_EMOJI_ID = 1460663385472503874
 CROSS_EMOJI_ID = 1460663471623504185
 DEVZONE_INVITE = "https://discord.gg/SmSx4uvVCD"
+INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1460289617264775333&permissions=5629501681765440&scope=bot+applications.commands"
+DASHBOARD_URL = "https://numexa.netlify.app"
+
 
 # ================= DATA STORAGE =================
 def load_data():
@@ -281,7 +284,7 @@ async def dashboard(ctx):
     await ctx.send(embed=embed, view=view)
 
 
-@bot.command(aliases=["invite", "inv"])
+@bot.command(name="inv")
 async def inv(ctx):
     embed = discord.Embed(
         title="👋 Hi! I'm Numexa",
@@ -418,18 +421,7 @@ async def slash_dashboard(i: discord.Interaction):
     view.add_item(discord.ui.Button(label="Open Dashboard", url=DASHBOARD_URL))
     await i.response.send_message(embed=discord.Embed(title="🧠 Dashboard", color=0x8A2BE2), view=view, ephemeral=True)
 
-# ================= STATUS =================
-async def status_loop():
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="/help | !help"))
-        await asyncio.sleep(30)
 
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    bot.loop.create_task(status_loop())
-    print(f"Logged in as {bot.user}")
 
 
 # ================= COUNTING LOGIC =================
