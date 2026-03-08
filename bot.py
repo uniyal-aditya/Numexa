@@ -13,6 +13,7 @@
 # - Server-based counting channel system (admin configurable)
 # ============================================================
 
+
 import discord
 from discord.ext import commands
 import sympy as sp
@@ -23,6 +24,18 @@ import itertools
 import asyncio
 import time
 from simpleeval import simple_eval, EvalWithCompoundTypes
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'alive')
+    def log_message(self, *args):
+        pass
+
+threading.Thread(target=lambda: HTTPServer(('0.0.0.0', 8080), HealthHandler).serve_forever(), daemon=True).start()
 
 # ───────────────────────────── CONFIG ─────────────────────────────
 TOKEN            = os.getenv("TOKEN")
