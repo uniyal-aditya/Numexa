@@ -250,263 +250,116 @@ class CalculatorView(discord.ui.View):
 
 
 # ═══════════════════ REDESIGNED HELP EMBED ════════════════════════
-# ═══════════════════════ HELP SYSTEM ═════════════════════════════
-
-HELP_CATEGORIES = {
-    "home": {
-        "label": "🏠  Overview",
-        "embed": lambda: _help_home(),
-    },
-    "calc": {
-        "label": "🧮  Calculator",
-        "embed": lambda: _help_calc(),
-    },
-    "calculus": {
-        "label": "∫  Calculus",
-        "embed": lambda: _help_calculus(),
-    },
-    "algebra": {
-        "label": "🔡  Algebra",
-        "embed": lambda: _help_algebra(),
-    },
-    "numtheory": {
-        "label": "🔢  Number Theory",
-        "embed": lambda: _help_numtheory(),
-    },
-    "stats": {
-        "label": "📊  Statistics",
-        "embed": lambda: _help_stats(),
-    },
-    "counting": {
-        "label": "🎯  Counting Game",
-        "embed": lambda: _help_counting(),
-    },
-    "settings": {
-        "label": "⚙️  Settings & Utility",
-        "embed": lambda: _help_settings(),
-    },
-}
-
-def _base_embed(title, description=""):
-    e = discord.Embed(title=title, description=description, color=BOT_COLOR)
-    e.set_footer(text="Numexa v2.0  •  numexa.netlify.app  •  Both ! and / work for every command")
-    return e
-
-def _help_home():
-    e = _base_embed(
-        "📘  Numexa — Command Centre",
-        "Scientific Discord bot for math, calculus, statistics and more.\n"
-        "`!` prefix and `/` slash commands both work for every command.\n\n"
-        "**Select a category below** to explore commands. ↓"
+def help_embed():
+    e = discord.Embed(
+        title="<:numexa:> Numexa — Command Centre",
+        description=(
+            "> Scientific Discord bot with calculus, math functions, counting & more.\n"
+            "> Prefix: `!`  ·  Slash: `/`  ·  Both work for every command."
+        ),
+        color=BOT_COLOR
     )
+
     e.add_field(
-        name="Categories",
+        name="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🧮  Math & Calculator",
         value=(
-            "🧮  **Calculator** — calc, ui, matrix, conv\n"
-            "∫  **Calculus** — diff, integrate, dsolve, limit, taylor\n"
-            "🔡  **Algebra** — simplify, expand, solve, roots, factor\n"
-            "🔢  **Number Theory** — gcd, lcm, nCr, nPr, factorial, isprime\n"
-            "📊  **Statistics** — mean, median, mode, stddev, variance\n"
-            "🎯  **Counting Game** — setcount, resetcount\n"
-            "⚙️  **Settings & Utility** — prefix, anglemode, ping, stats, info"
+            "`calc <expr>` — Evaluate any expression\n"
+            "`ui` — Button calculator in Discord\n"
+            "`matrix <op> <A>` — Matrix operations\n"
+            "`stats <nums>` — Statistics on a list\n"
+            "`conv <val> <from> <to>` — Unit conversion"
         ),
         inline=False
     )
+
+    e.add_field(
+        name="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n∫  Calculus",
+        value=(
+            "`diff <expr>` — Differentiate w.r.t. x\n"
+            "`integrate <expr>` — Integrate w.r.t. x\n"
+            "`dsolve <eq>` — Solve differential equation\n"
+            "`limit <expr> <point>` — Compute a limit\n"
+            "`taylor <expr> <n>` — Taylor series (n terms)"
+        ),
+        inline=False
+    )
+
+    e.add_field(
+        name="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📐  Trig & Functions",
+        value=(
+            "`trig <expr>` — sin, cos, tan, asin, acos, atan\n"
+            "`hyp <expr>` — sinh, cosh, tanh\n"
+            "`anglemode <deg|rad>` — Switch angle unit\n"
+            "**Supported in !calc:** `sin` `cos` `tan` `asin` `acos` `atan`\n"
+            "`sinh` `cosh` `tanh` `sqrt` `cbrt` `log` `ln` `log2` `exp` `abs` `floor` `ceil` `round`"
+        ),
+        inline=False
+    )
+
+    e.add_field(
+        name="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔢  Number Theory & Combinatorics",
+        value=(
+            "`factor <n>` — Prime factorisation\n"
+            "`isprime <n>` — Primality check\n"
+            "`gcd <a> <b>` — GCD of two numbers\n"
+            "`lcm <a> <b>` — LCM of two numbers\n"
+            "`ncr <n> <r>` — Combinations  nCr\n"
+            "`npr <n> <r>` — Permutations  nPr\n"
+            "`factorial <n>` — n!"
+        ),
+        inline=False
+    )
+
+    e.add_field(
+        name="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊  Statistics",
+        value=(
+            "`mean <nums>` — Average\n"
+            "`median <nums>` — Median\n"
+            "`mode <nums>` — Mode\n"
+            "`stddev <nums>` — Standard deviation\n"
+            "`variance <nums>` — Variance\n"
+            "*(pass numbers space-separated, e.g. `!mean 2 4 6 8`)*"
+        ),
+        inline=False
+    )
+
+    e.add_field(
+        name="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔡  Algebra & Symbolic",
+        value=(
+            "`simplify <expr>` — Simplify expression\n"
+            "`expand <expr>` — Expand expression\n"
+            "`factor_expr <expr>` — Factor a polynomial\n"
+            "`solve <expr>` — Solve equation for x\n"
+            "`roots <poly>` — Find polynomial roots"
+        ),
+        inline=False
+    )
+
+    e.add_field(
+        name="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔢  Counting Game",
+        value=(
+            "`setcount` — Set counting channel *(admin)*\n"
+            "`resetcount` — Reset count to 0 *(admin)*"
+        ),
+        inline=False
+    )
+
+    e.add_field(
+        name="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚙️  Settings & Utility",
+        value=(
+            "`setprefix <p>` — Change prefix *(admin)*\n"
+            "`noprefix @user` — Toggle no-prefix *(owner)*\n"
+            "`anglemode <deg|rad>` — Set trig unit\n"
+            "`ping` — Latency  ·  `stats` — Bot stats\n"
+            "`serverinfo` — Server info  ·  `userinfo [@u]` — User info\n"
+            "`invite` — Invite link  ·  `support` — Support server\n"
+            "`dashboard` — Web dashboard"
+        ),
+        inline=False
+    )
+
+    e.set_footer(text="Numexa v2.0 • numexa.netlify.app • !help for this menu")
     return e
-
-def _help_calc():
-    e = _base_embed("🧮  Calculator Commands")
-    e.add_field(name="Basic Eval", inline=False, value=(
-        "`!calc <expr>` — Evaluate any expression\n"
-        "> `!calc 2^10 + sqrt(144)`\n"
-        "> `!calc sin(pi/6)` · `!calc log(1000)`"
-    ))
-    e.add_field(name="Button UI", inline=False, value=(
-        "`!ui` — Interactive click-based calculator in Discord\n"
-        "> Buttons: `0–9` `+ − × ÷ ^ .` `( )` `sin cos tan √ log` `= ⌫ C`\n"
-        "> Locked to the user who opened it"
-    ))
-    e.add_field(name="Matrix Operations", inline=False, value=(
-        "`!matrix <op> <A>` — Perform matrix operations\n"
-        "> ops: `inv` `det` `transpose` `eigenvals` `rref` `rank` `trace` `norm`\n"
-        "> `!matrix det [[1,2],[3,4]]`"
-    ))
-    e.add_field(name="Unit Conversion", inline=False, value=(
-        "`!conv <value> <from> <to>` — Convert units\n"
-        "> `!conv 5 km m` · `!conv 100 c f` · `!conv 60 mph kmh`\n"
-        "> Supports: length · mass · time · speed · temperature"
-    ))
-    e.add_field(name="Supported Functions in !calc", inline=False, value=(
-        "`sin` `cos` `tan` `asin` `acos` `atan` `atan2`\n"
-        "`sinh` `cosh` `tanh` · `sqrt` `cbrt` `exp`\n"
-        "`log` `ln` `log2` `log10` · `abs` `floor` `ceil` `round`\n"
-        "`factorial` `nCr` `nPr` `gcd` `lcm`\n"
-        "Constants: `pi` `e` `tau` `phi` `inf`"
-    ))
-    return e
-
-def _help_calculus():
-    e = _base_embed("∫  Calculus Commands", "All powered by SymPy. All w.r.t. x.")
-    e.add_field(name="Differentiation", inline=False, value=(
-        "`!diff <expr>` — Differentiate w.r.t. x\n"
-        "> `!diff x^4` → `4*x**3`\n"
-        "> `!diff sin(x)*x` → product rule"
-    ))
-    e.add_field(name="Integration", inline=False, value=(
-        "`!integrate <expr>` — Indefinite integral w.r.t. x\n"
-        "> `!integrate x^3` → `x**4/4 + C`\n"
-        "> `!integrate sin(x)` → `-cos(x) + C`"
-    ))
-    e.add_field(name="Differential Equations", inline=False, value=(
-        "`!dsolve <eq>` — Solve an ODE\n"
-        "> `!dsolve f(x).diff(x) - f(x)` → `C1*exp(x)`\n"
-        "> `!dsolve f(x).diff(x,2) + f(x)` → `C1*sin(x) + C2*cos(x)`"
-    ))
-    e.add_field(name="Limits", inline=False, value=(
-        "`!limit <expr> <point>` — Compute a limit as x → point\n"
-        "> `!limit sin(x)/x 0` → `1`\n"
-        "> `!limit 1/x oo` → `0`"
-    ))
-    e.add_field(name="Taylor Series", inline=False, value=(
-        "`!taylor <expr> <n>` — Taylor expansion around x=0, n terms\n"
-        "> `!taylor sin(x) 6` → first 6 terms of sin(x)"
-    ))
-    return e
-
-def _help_algebra():
-    e = _base_embed("🔡  Algebra & Symbolic Commands", "All powered by SymPy.")
-    e.add_field(name="Simplify / Expand", inline=False, value=(
-        "`!simplify <expr>` — Simplify an expression\n"
-        "> `!simplify (x^2-1)/(x-1)` → `x + 1`\n\n"
-        "`!expand <expr>` — Expand brackets\n"
-        "> `!expand (x+1)^3` → `x**3 + 3*x**2 + 3*x + 1`"
-    ))
-    e.add_field(name="Factorise", inline=False, value=(
-        "`!factor_expr <expr>` — Factor a polynomial\n"
-        "> `!factor_expr x^2 - 5*x + 6` → `(x-2)*(x-3)`"
-    ))
-    e.add_field(name="Solve & Roots", inline=False, value=(
-        "`!solve <expr>` — Solve expression = 0 for x\n"
-        "> `!solve x^2 - 4` → `[-2, 2]`\n\n"
-        "`!roots <poly>` — Polynomial roots with multiplicity\n"
-        "> `!roots x^3 - 3*x + 2` → roots and their multiplicities"
-    ))
-    return e
-
-def _help_numtheory():
-    e = _base_embed("🔢  Number Theory & Combinatorics")
-    e.add_field(name="Primes & Factors", inline=False, value=(
-        "`!factor <n>` — Prime factorisation\n"
-        "> `!factor 360` → `2^3 × 3^2 × 5`\n\n"
-        "`!isprime <n>` — Check if n is prime\n"
-        "> `!isprime 97` → ✅ Yes"
-    ))
-    e.add_field(name="GCD / LCM", inline=False, value=(
-        "`!gcd <a> <b>` — Greatest common divisor\n"
-        "> `!gcd 48 18` → `6`\n\n"
-        "`!lcm <a> <b>` — Least common multiple\n"
-        "> `!lcm 4 6` → `12`"
-    ))
-    e.add_field(name="Combinatorics", inline=False, value=(
-        "`!ncr <n> <r>` — Combinations C(n, r)\n"
-        "> `!ncr 10 3` → `120`\n\n"
-        "`!npr <n> <r>` — Permutations P(n, r)\n"
-        "> `!npr 5 2` → `20`\n\n"
-        "`!factorial <n>` — n!  (max n = 1000)\n"
-        "> `!factorial 10` → `3628800`"
-    ))
-    return e
-
-def _help_stats():
-    e = _base_embed("📊  Statistics Commands", "Pass numbers space-separated: `!mean 2 4 6 8 10`")
-    e.add_field(name="Commands", inline=False, value=(
-        "`!mean <nums>` — Arithmetic mean (average)\n"
-        "`!median <nums>` — Middle value\n"
-        "`!mode <nums>` — Most frequent value(s)\n"
-        "`!stddev <nums>` — Sample standard deviation σ\n"
-        "`!variance <nums>` — Sample variance\n"
-    ))
-    e.add_field(name="Example", inline=False, value=(
-        "`!stddev 2 4 4 4 5 5 7 9`\n"
-        "> σ = `2.0`"
-    ))
-    return e
-
-def _help_counting():
-    e = _base_embed("🎯  Counting Game", "A server-wide counting channel where users count up together.")
-    e.add_field(name="Setup (Admin Only)", inline=False, value=(
-        "`!setcount` — Set the current channel as the counting channel\n"
-        "`!resetcount` — Reset count back to 0, restart from 1"
-    ))
-    e.add_field(name="Rules", inline=False, value=(
-        "✅ Send the next number in sequence starting from **1**\n"
-        "❌ Wrong number → count resets, explained in chat\n"
-        "❌ Same user twice in a row → count resets\n"
-        "❌ Sending non-numbers → count resets"
-    ))
-    e.add_field(name="Reactions", inline=False, value=(
-        "✅ Green check = correct count\n"
-        "❌ Red cross = mistake, count reset"
-    ))
-    return e
-
-def _help_settings():
-    e = _base_embed("⚙️  Settings & Utility Commands")
-    e.add_field(name="Server Settings", inline=False, value=(
-        "`!setprefix <p>` — Change command prefix *(admin, max 5 chars)*\n"
-        "`!anglemode <deg|rad>` — Set your personal trig angle unit\n"
-        "`!noprefix @user` — Toggle prefix-free mode for a user *(owner only)*"
-    ))
-    e.add_field(name="Bot Info", inline=False, value=(
-        "`!ping` — WebSocket latency\n"
-        "`!stats` — Servers, users, uptime, latency\n"
-        "`!serverinfo` — Server name, owner, members, channels\n"
-        "`!userinfo [@user]` — ID, roles, join date, creation date"
-    ))
-    e.add_field(name="Links", inline=False, value=(
-        "`!invite` — Invite Numexa to your server\n"
-        "`!support` — Join the Devzone support server\n"
-        "`!dashboard` — Open the Numexa web dashboard"
-    ))
-    return e
-
-
-class HelpSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(
-                label=info["label"].split("  ", 1)[1] if "  " in info["label"] else info["label"],
-                value=key,
-                emoji=info["label"].split("  ")[0],
-                default=(key == "home")
-            )
-            for key, info in HELP_CATEGORIES.items()
-        ]
-        super().__init__(
-            placeholder="📂  Select a category…",
-            min_values=1,
-            max_values=1,
-            options=options
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        key = self.values[0]
-        # Update the default option visually
-        for opt in self.options:
-            opt.default = (opt.value == key)
-        embed = HELP_CATEGORIES[key]["embed"]()
-        await interaction.response.edit_message(embed=embed, view=self.view)
-
-
-class HelpView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=180)
-        self.add_item(HelpSelect())
-
-
-def help_embed():
-    """Returns the home embed — used for first send."""
-    return _help_home()
 
 
 # ═══════════════════════ MATH COMMANDS ════════════════════════════
@@ -962,7 +815,7 @@ async def userinfo(ctx, member: discord.Member = None):
 # ── Links ──────────────────────────────────────────────────────────
 @bot.command(name="help")
 async def help_cmd(ctx):
-    await ctx.send(embed=help_embed(), view=HelpView())
+    await ctx.send(embed=help_embed())
 
 @bot.command()
 async def support(ctx):
@@ -1233,7 +1086,7 @@ async def slash_resetcount(i: discord.Interaction):
 
 @bot.tree.command(name="help",       description="Show all commands")
 async def slash_help(i: discord.Interaction):
-    await i.response.send_message(embed=help_embed(), view=HelpView(), ephemeral=True)
+    await i.response.send_message(embed=help_embed(), ephemeral=True)
 
 @bot.tree.command(name="invite",     description="Get the invite link")
 async def slash_invite(i: discord.Interaction):
