@@ -280,19 +280,23 @@ def _help_calculus() -> discord.Embed:
 
 def _help_settings() -> discord.Embed:
     e = numexa_embed("⚙️ Settings Commands")
-    e.add_field(name="`setprefix <p>`  *(Admin)*",   value="Change server prefix.",          inline=False)
-    e.add_field(name="`anglemode <deg|rad>`",         value="Set your trig angle unit.",      inline=False)
-    e.add_field(name="`noprefix <@user>`  *(Owner)*", value="Toggle no-prefix for a user.",  inline=False)
+    e.add_field(name="`setprefix <prefix>`  *(server owner)*",
+                value="Change the server command prefix.\n```\n!setprefix ?```", inline=False)
+    e.add_field(name="`anglemode <deg|rad>`",
+                value="Set your personal trig angle unit.\n```\n!anglemode deg```", inline=False)
+    e.add_field(name="`noprefix <@user>`  *(bot owner)*",
+                value="Grant a user the ability to run commands without any prefix.", inline=False)
     return e
 
 def _help_counting() -> discord.Embed:
     e = numexa_embed("🔢 Counting Game")
-    e.add_field(name="`setcount`  *(Admin)*",   value="Set counting channel.",    inline=False)
-    e.add_field(name="`resetcount`  *(Admin)*", value="Reset count to 0.",        inline=False)
+    e.add_field(name="`setcount`  *(server owner)*",   value="Set this channel as counting channel.", inline=False)
+    e.add_field(name="`resetcount`  *(server owner)*", value="Reset count back to 0.",               inline=False)
+    e.add_field(name="`milestones`",                   value="Show configured milestones.",           inline=False)
     e.add_field(name="📋 Rules",
-                value="> Count from **1**, no two in a row, wrong number resets.", inline=False)
-    e.add_field(name="⭐ `setmilestone`  *(Premium)*",
-                value="Award a role at a count milestone.", inline=False)
+                value="> Count from **1**, no two in a row, wrong number resets to 0.", inline=False)
+    e.add_field(name="⭐ `setmilestone <count> <@role>`  *(Premium + server owner)*",
+                value="Award a role when counting hits a milestone.", inline=False)
     return e
 
 def _help_utility() -> discord.Embed:
@@ -314,21 +318,23 @@ def _help_premium() -> discord.Embed:
     e = discord.Embed(
         title="⭐ Numexa Premium",
         description=(
-            "Unlock powerful features for your server!\n\n"
-            f"**Free Trial:** `!trial` — {TRIAL_DAYS} days, one-time per server\n"
-            f"**Buy Premium:** Open a ticket in [The Devzone]({DEVZONE_INVITE})\n"
-            "**Check Status:** `!premium`"
+            "Powerful features unlocked for your **entire server**!\n\n"
+            f"🎁 **Free Trial:** `!trial` — {TRIAL_DAYS} days, one-time per server *(server owner only)*\n"
+            f"💳 **Buy Premium:** Open a ticket in [The Devzone]({DEVZONE_INVITE})\n"
+            f"📊 **Check Status:** `!premium`\n\n"
+            "**All commands below work for everyone once the server has Premium.**\n"
+            "Non-premium servers will see a purchase prompt."
         ),
         color=PREMIUM_COLOR
     )
-    e.add_field(name="📊 `plot <expr>`",        value="Graph any function",             inline=True)
-    e.add_field(name="📝 `history`",            value="Last 10 calculations",           inline=True)
-    e.add_field(name="🧮 `matrix <op>`",        value="Matrix operations",             inline=True)
-    e.add_field(name="📐 `stepdiff / stepint`", value="Step-by-step calculus",         inline=True)
-    e.add_field(name="🔢 `setmilestone`",       value="Count milestone role rewards",  inline=True)
-    e.add_field(name="🔔 `setdaily`",           value="Daily math problem in channel", inline=True)
-    e.add_field(name="📌 `bookmark`",           value="Save & recall expressions",     inline=True)
-    e.add_field(name="🎨 `botnick`",            value="Custom bot nickname",           inline=True)
+    e.add_field(name="📊 `plot <expr>`",        value="Graph any function.\n```\n!plot x**2 + sin(x)```",     inline=False)
+    e.add_field(name="📝 `history`",            value="Last 10 calcs in this server.\n```\n!history```",         inline=False)
+    e.add_field(name="🧮 `matrix <op> <data>`", value="det, inv, trans, add, mul.\n```\n!matrix det 1,2|3,4```", inline=False)
+    e.add_field(name="📐 `stepdiff` / `stepint`",value="Step-by-step calculus.\n```\n!stepdiff x**3 + 2*x```",  inline=False)
+    e.add_field(name="🔢 `setmilestone`  *(server owner)*", value="Role reward at count milestone.\n```\n!setmilestone 100 @Role```", inline=False)
+    e.add_field(name="🔔 `setdaily` / `stopdaily`  *(server owner)*", value="Daily math problem at midnight UTC.\n```\n!setdaily```", inline=False)
+    e.add_field(name="📌 `bookmark <save|list|use|delete>`", value="Save & recall expressions.\n```\n!bookmark save q x**2+3*x```", inline=False)
+    e.add_field(name="🎨 `botnick [nick]`  *(server owner)*", value="Custom bot nickname in your server.\n```\n!botnick MathBot```", inline=False)
     e.set_footer(text="Numexa Premium ⭐ • Made with 💜 by Aditya")
     return e
 
@@ -552,8 +558,11 @@ async def cmd_ui(ctx):
 
 # ── Settings ──────────────────────────────────────────────────────
 @bot.command(name="setprefix")
-@commands.has_permissions(administrator=True)
 async def cmd_setprefix(ctx, prefix: str):
+    if not ctx.guild:
+        return await ctx.send(err("Server-only command."))
+    if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
+        return await ctx.send(err("Only the **server owner** can change the prefix."))
     if len(prefix) > 5:
         return await ctx.send(err("Prefix must be 5 characters or fewer."))
     custom_prefixes[ctx.guild.id]       = prefix
@@ -589,8 +598,11 @@ async def cmd_noprefix(ctx, member: discord.Member):
 
 # ── Counting ──────────────────────────────────────────────────────
 @bot.command(name="setcount")
-@commands.has_permissions(administrator=True)
 async def cmd_setcount(ctx):
+    if not ctx.guild:
+        return await ctx.send(err("Server-only command."))
+    if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
+        return await ctx.send(err("Only the **server owner** can set the counting channel."))
     gid = str(ctx.guild.id)
     data["counting"][gid] = {
         "channel": ctx.channel.id, "current": 0,
@@ -600,8 +612,11 @@ async def cmd_setcount(ctx):
     await ctx.send(ok(f"Counting channel set to {ctx.channel.mention}. Start counting from **1**!"))
 
 @bot.command(name="resetcount")
-@commands.has_permissions(administrator=True)
 async def cmd_resetcount(ctx):
+    if not ctx.guild:
+        return await ctx.send(err("Server-only command."))
+    if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
+        return await ctx.send(err("Only the **server owner** can reset the count."))
     gid = str(ctx.guild.id)
     if gid in data["counting"]:
         data["counting"][gid]["current"]   = 0
@@ -957,8 +972,11 @@ async def cmd_stepint(ctx, *, expr: str):
 
 # ── 6. Counting Milestone Rewards ────────────────────────────────
 @bot.command(name="setmilestone")
-@commands.has_permissions(administrator=True)
 async def cmd_setmilestone(ctx, count: int, role: discord.Role):
+    if not ctx.guild:
+        return await ctx.send(err("Server-only command."))
+    if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
+        return await ctx.send(err("Only the **server owner** can set milestones."))
     if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     gid = str(ctx.guild.id)
@@ -986,8 +1004,11 @@ async def cmd_milestones(ctx):
 
 # ── 7. Daily Math Problem ─────────────────────────────────────────
 @bot.command(name="setdaily")
-@commands.has_permissions(administrator=True)
 async def cmd_setdaily(ctx):
+    if not ctx.guild:
+        return await ctx.send(err("Server-only command."))
+    if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
+        return await ctx.send(err("Only the **server owner** can set the daily channel."))
     if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     data["daily"][str(ctx.guild.id)] = {"channel": ctx.channel.id, "last_sent": ""}
@@ -995,8 +1016,11 @@ async def cmd_setdaily(ctx):
     await ctx.send(ok(f"Daily math problem will be posted in {ctx.channel.mention} every day at midnight UTC!"))
 
 @bot.command(name="stopdaily")
-@commands.has_permissions(administrator=True)
 async def cmd_stopdaily(ctx):
+    if not ctx.guild:
+        return
+    if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
+        return await ctx.send(err("Only the **server owner** can stop the daily problem."))
     if not ctx.guild:
         return
     data["daily"].pop(str(ctx.guild.id), None)
@@ -1061,8 +1085,11 @@ async def cmd_bookmark(ctx, action: str, name: str = None, *, expr: str = None):
 
 # ── 9. Custom Bot Nickname ────────────────────────────────────────
 @bot.command(name="botnick")
-@commands.has_permissions(administrator=True)
 async def cmd_botnick(ctx, *, nick: str = None):
+    if not ctx.guild:
+        return await ctx.send(err("Server-only command."))
+    if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
+        return await ctx.send(err("Only the **server owner** can change my nickname."))
     if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     try:
@@ -1184,8 +1211,10 @@ async def slash_premium(i: discord.Interaction):
 @bot.tree.command(name="setprefix", description="Change the server prefix (admin only)")
 @app_commands.describe(prefix="New prefix (max 5 chars)")
 async def slash_setprefix(i: discord.Interaction, prefix: str):
-    if not i.guild or not i.user.guild_permissions.administrator:
-        return await i.response.send_message(err("Admin only, server-only."), ephemeral=True)
+    if not i.guild:
+        return await i.response.send_message(err("Server-only command."), ephemeral=True)
+    if i.user.id != i.guild.owner_id and not is_owner(i.user.id):
+        return await i.response.send_message(err("Only the **server owner** can change the prefix."), ephemeral=True)
     if len(prefix) > 5:
         return await i.response.send_message(err("Max 5 characters."), ephemeral=True)
     custom_prefixes[i.guild.id]        = prefix
@@ -1223,8 +1252,10 @@ async def slash_noprefix(i: discord.Interaction, member: discord.Member):
 
 @bot.tree.command(name="setcount", description="Set counting channel (admin only)")
 async def slash_setcount(i: discord.Interaction):
-    if not i.guild or not i.user.guild_permissions.administrator:
-        return await i.response.send_message(err("Admin only."), ephemeral=True)
+    if not i.guild:
+        return await i.response.send_message(err("Server-only command."), ephemeral=True)
+    if i.user.id != i.guild.owner_id and not is_owner(i.user.id):
+        return await i.response.send_message(err("Only the **server owner** can set the counting channel."), ephemeral=True)
     gid = str(i.guild.id)
     data["counting"][gid] = {"channel": i.channel.id, "current": 0, "last_user": None, "milestones": {}}
     save_data()
@@ -1232,8 +1263,10 @@ async def slash_setcount(i: discord.Interaction):
 
 @bot.tree.command(name="resetcount", description="Reset the counting game (admin only)")
 async def slash_resetcount(i: discord.Interaction):
-    if not i.guild or not i.user.guild_permissions.administrator:
-        return await i.response.send_message(err("Admin only."), ephemeral=True)
+    if not i.guild:
+        return await i.response.send_message(err("Server-only command."), ephemeral=True)
+    if i.user.id != i.guild.owner_id and not is_owner(i.user.id):
+        return await i.response.send_message(err("Only the **server owner** can reset the count."), ephemeral=True)
     gid = str(i.guild.id)
     if gid in data["counting"]:
         data["counting"][gid]["current"]   = 0
@@ -1314,6 +1347,74 @@ async def slash_dashboard(i: discord.Interaction):
     v.add_item(discord.ui.Button(label="Open Dashboard", style=discord.ButtonStyle.link, url=DASHBOARD_URL))
     await i.response.send_message(embed=e, view=v, ephemeral=True)
 
+
+
+@bot.tree.command(name="grantpremium", description="Grant premium to a server (bot owner only)")
+@app_commands.describe(guild_id="The server ID to grant premium to", days="Number of days (leave empty for lifetime)")
+async def slash_grantpremium(i: discord.Interaction, guild_id: str, days: int = None):
+    if not is_owner(i.user.id):
+        return await i.response.send_message(err("Bot owner only."), ephemeral=True)
+    try:
+        gid = int(guild_id)
+    except ValueError:
+        return await i.response.send_message(err("Invalid guild ID."), ephemeral=True)
+    activate_premium(gid, i.user.id, days, "paid")
+    exp = f"{days} days" if days else "lifetime"
+    await i.response.send_message(ok(f"Premium granted to guild `{gid}` for **{exp}**."), ephemeral=True)
+    guild = bot.get_guild(gid)
+    if guild and guild.owner:
+        try:
+            e = discord.Embed(
+                title="⭐ Numexa Premium Activated!",
+                description=(
+                    f"**{guild.name}** now has **Numexa Premium**!\n\n"
+                    f"{'Expires in **' + str(days) + ' days**' if days else '**Lifetime** access'}.\n\n"
+                    "Use `!help` → ⭐ Premium to explore all features."
+                ),
+                color=PREMIUM_COLOR
+            )
+            await guild.owner.send(embed=e)
+        except discord.Forbidden:
+            pass
+
+@bot.tree.command(name="revokepremium", description="Revoke premium from a server (bot owner only)")
+@app_commands.describe(guild_id="The server ID to revoke premium from")
+async def slash_revokepremium(i: discord.Interaction, guild_id: str):
+    if not is_owner(i.user.id):
+        return await i.response.send_message(err("Bot owner only."), ephemeral=True)
+    try:
+        gid = int(guild_id)
+    except ValueError:
+        return await i.response.send_message(err("Invalid guild ID."), ephemeral=True)
+    revoke_premium(gid)
+    await i.response.send_message(ok(f"Premium revoked from guild `{gid}`."), ephemeral=True)
+
+@bot.tree.command(name="premiumlist", description="List all premium servers (bot owner only)")
+async def slash_premiumlist(i: discord.Interaction):
+    if not is_owner(i.user.id):
+        return await i.response.send_message(err("Bot owner only."), ephemeral=True)
+    active = [
+        (gid, rec) for gid, rec in data["premium"].items()
+        if rec.get("active") and (not rec.get("expires") or time.time() < rec["expires"])
+    ]
+    if not active:
+        return await i.response.send_message("No active premium servers.", ephemeral=True)
+    e = numexa_embed("⭐ Premium Servers", f"{len(active)} active")
+    for gid, rec in active[:10]:
+        guild = bot.get_guild(int(gid))
+        name  = guild.name if guild else f"ID: {gid}"
+        exp   = f"<t:{rec['expires']}:R>" if rec.get("expires") else "Lifetime"
+        e.add_field(name=name, value=f"Plan: `{rec['plan']}` • Expires: {exp}", inline=False)
+    await i.response.send_message(embed=e, ephemeral=True)
+
+
+@bot.tree.command(name="sync", description="Force re-sync slash commands (bot owner only)")
+async def slash_sync(i: discord.Interaction):
+    if not is_owner(i.user.id):
+        return await i.response.send_message(err("Bot owner only."), ephemeral=True)
+    await i.response.defer(ephemeral=True)
+    synced = await bot.tree.sync()
+    await i.followup.send(ok(f"Synced **{len(synced)}** slash commands globally."), ephemeral=True)
 
 # ═════════════════════════ BOT EVENTS ═════════════════════════════
 
