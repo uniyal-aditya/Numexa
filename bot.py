@@ -34,6 +34,15 @@ DASHBOARD_URL    = "https://numexa.netlify.app"
 BOT_COLOR        = 0x8A2BE2
 START_TIME       = time.time()
 
+# Custom emoji helpers — used everywhere instead of plain ✅ / ❌
+def CHECK(bot):
+    e = bot.get_emoji(CHECK_EMOJI_ID)
+    return str(e) if e else "✅"
+
+def CROSS(bot):
+    e = bot.get_emoji(CROSS_EMOJI_ID)
+    return str(e) if e else "❌"
+
 
 # ───────────────────────── DATA STORAGE ───────────────────────────
 def load_data() -> dict:
@@ -129,88 +138,158 @@ def uptime_str() -> str:
     m, s   = divmod(rem, 60)
     return f"{h}h {m}m {s}s"
 
+def ok(msg: str) -> str:
+    """Success message using custom check emoji."""
+    e = bot.get_emoji(CHECK_EMOJI_ID)
+    emoji = str(e) if e else "✅"
+    return f"{emoji} {msg}"
+
+def err(msg: str) -> str:
+    """Error message using custom cross emoji."""
+    e = bot.get_emoji(CROSS_EMOJI_ID)
+    emoji = str(e) if e else "❌"
+    return f"{emoji} {msg}"
+
 
 # ─────────────────────── HELP MENU SYSTEM ─────────────────────────
-# Each category: (label, emoji, embed-builder)
 
 def _help_overview() -> discord.Embed:
     e = numexa_embed(
         "📘 Numexa — Help Menu",
         "Welcome to **Numexa**, your scientific Discord calculator!\n\n"
-        "Use the dropdown below to browse command categories.\n"
+        "Use the **dropdown below** to browse command categories.\n"
         "Both prefix (`!`) and slash (`/`) commands are supported."
     )
-    e.add_field(name="📂 Categories",
-                value="🧮 Calculator\n📐 Calculus\n⚙️ Settings\n🔢 Counting\n🛠️ Utility\n🔗 Links",
-                inline=False)
+    e.add_field(
+        name="📂 Available Categories",
+        value=(
+            "> 🧮 **Calculator** — Evaluate expressions & interactive UI\n"
+            "> 📐 **Calculus** — Derivatives, integrals & differential equations\n"
+            "> ⚙️ **Settings** — Prefix, angle mode & no-prefix\n"
+            "> 🔢 **Counting** — Server counting game setup\n"
+            "> 🛠️ **Utility** — Ping, stats, serverinfo, userinfo\n"
+            "> 🔗 **Links** — Invite, support & dashboard"
+        ),
+        inline=False
+    )
+    e.set_thumbnail(url="https://numexa.netlify.app/favicon.ico")
     return e
 
 def _help_calculator() -> discord.Embed:
-    e = numexa_embed("🧮 Calculator Commands")
-    e.add_field(name="`calc <expr>`",
-                value="Evaluate a math expression.\n"
-                      "> `!calc sqrt(2)*pi`\n"
-                      "> Supports: `+` `-` `*` `/` `**` `^` `%` `sqrt` `abs` `log` `ln` `pi` `e`",
-                inline=False)
-    e.add_field(name="`ui`",
-                value="Open the interactive button calculator with scientific functions.",
-                inline=False)
+    e = numexa_embed(
+        "🧮 Calculator Commands",
+        "Evaluate mathematical expressions with full scientific support."
+    )
+    e.add_field(
+        name="📌 `calc <expr>`",
+        value=(
+            "Evaluate a math expression.\n"
+            "```\n!calc sqrt(2)*pi\n!calc sin(45) + log(100)```"
+            "**Supported:** `+` `-` `*` `/` `**` `^` `%` `sqrt` `abs`\n"
+            "`log` `ln` `floor` `ceil` `round` `pi` `e` `inf`"
+        ),
+        inline=False
+    )
+    e.add_field(
+        name="📌 `ui`",
+        value=(
+            "Open the **interactive button calculator** with full scientific functions.\n"
+            "```\n!ui```"
+            "Includes: `sin` `cos` `tan` `√` `log` and all standard operators."
+        ),
+        inline=False
+    )
     return e
 
 def _help_calculus() -> discord.Embed:
-    e = numexa_embed("📐 Calculus Commands")
-    e.add_field(name="`diff <expr>`",
-                value="Differentiate an expression w.r.t. x.\n> `!diff x**3 + 2*x`",
-                inline=False)
-    e.add_field(name="`integrate <expr>`",
-                value="Integrate an expression w.r.t. x.\n> `!integrate x**2 + 3*x`",
-                inline=False)
-    e.add_field(name="`dsolve <eq>`",
-                value="Solve a differential equation.\n> `!dsolve f(x).diff(x) - f(x)`",
-                inline=False)
+    e = numexa_embed(
+        "📐 Calculus Commands",
+        "Powered by **SymPy** — all expressions are w.r.t. `x`."
+    )
+    e.add_field(
+        name="📌 `diff <expr>`",
+        value="Differentiate an expression.\n```\n!diff x**3 + 2*x```",
+        inline=False
+    )
+    e.add_field(
+        name="📌 `integrate <expr>`",
+        value="Integrate an expression (indefinite).\n```\n!integrate x**2 + 3*x```",
+        inline=False
+    )
+    e.add_field(
+        name="📌 `dsolve <eq>`",
+        value="Solve a differential equation.\n```\n!dsolve f(x).diff(x) - f(x)```",
+        inline=False
+    )
     return e
 
 def _help_settings() -> discord.Embed:
-    e = numexa_embed("⚙️ Settings Commands")
-    e.add_field(name="`setprefix <prefix>`",
-                value="Change the server's command prefix. *(Admin only)*\n> `!setprefix ?`",
-                inline=False)
-    e.add_field(name="`anglemode <deg|rad>`",
-                value="Set your personal trig angle unit.\n> `!anglemode deg`",
-                inline=False)
-    e.add_field(name="`noprefix <@user>`",
-                value="Toggle no-prefix mode for a user. *(Bot owner only)*\n> `!noprefix @user`",
-                inline=False)
+    e = numexa_embed(
+        "⚙️ Settings Commands",
+        "Configure Numexa for your server or personal preferences."
+    )
+    e.add_field(
+        name="📌 `setprefix <prefix>`  *(Admin only)*",
+        value="Change the server's command prefix.\n```\n!setprefix ?```",
+        inline=False
+    )
+    e.add_field(
+        name="📌 `anglemode <deg|rad>`",
+        value="Set your personal trig angle unit.\n```\n!anglemode deg```",
+        inline=False
+    )
+    e.add_field(
+        name="📌 `noprefix <@user>`  *(Owner only)*",
+        value="Toggle no-prefix mode for a user.\n```\n!noprefix @user```",
+        inline=False
+    )
     return e
 
 def _help_counting() -> discord.Embed:
-    e = numexa_embed("🔢 Counting Commands")
-    e.add_field(name="`setcount`",
-                value="Set the current channel as the counting channel. *(Admin only)*",
-                inline=False)
-    e.add_field(name="`resetcount`",
-                value="Reset the count back to 0. *(Admin only)*",
-                inline=False)
-    e.add_field(name="📋 Rules",
-                value="• Count in order starting from **1**\n"
-                      "• No two messages in a row from the same user\n"
-                      "• Breaking the count resets it to 0",
-                inline=False)
+    e = numexa_embed(
+        "🔢 Counting Game",
+        "Set up a counting channel where members count together!"
+    )
+    e.add_field(
+        name="📌 `setcount`  *(Admin only)*",
+        value="Set the current channel as the counting channel.\n```\n!setcount```",
+        inline=False
+    )
+    e.add_field(
+        name="📌 `resetcount`  *(Admin only)*",
+        value="Reset the count back to 0.\n```\n!resetcount```",
+        inline=False
+    )
+    e.add_field(
+        name="📋 Rules",
+        value=(
+            "> • Count in order starting from **1**\n"
+            "> • No two messages in a row from the same user\n"
+            "> • Wrong number or non-number resets count to 0"
+        ),
+        inline=False
+    )
     return e
 
 def _help_utility() -> discord.Embed:
-    e = numexa_embed("🛠️ Utility Commands")
-    e.add_field(name="`ping`",       value="Check Numexa's WebSocket latency.",              inline=False)
-    e.add_field(name="`stats`",      value="View bot statistics (servers, users, uptime).",   inline=False)
-    e.add_field(name="`serverinfo`", value="View information about the current server.",       inline=False)
-    e.add_field(name="`userinfo [@user]`", value="View info about yourself or a mentioned member.", inline=False)
+    e = numexa_embed(
+        "🛠️ Utility Commands",
+        "General purpose commands for server and user info."
+    )
+    e.add_field(name="📌 `ping`",              value="Check Numexa's WebSocket latency.",              inline=False)
+    e.add_field(name="📌 `stats`",             value="View bot statistics (servers, users, uptime).",   inline=False)
+    e.add_field(name="📌 `serverinfo`",        value="View information about the current server.",       inline=False)
+    e.add_field(name="📌 `userinfo [@user]`",  value="View info about yourself or a mentioned member.", inline=False)
     return e
 
 def _help_links() -> discord.Embed:
-    e = numexa_embed("🔗 Links & Resources")
-    e.add_field(name="`invite`",    value=f"[Add Numexa to your server]({INVITE_URL})",   inline=False)
-    e.add_field(name="`support`",   value=f"[Join The Devzone]({DEVZONE_INVITE})",         inline=False)
-    e.add_field(name="`dashboard`", value=f"[Open the web dashboard]({DASHBOARD_URL})",    inline=False)
+    e = numexa_embed(
+        "🔗 Links & Resources",
+        "Everything you need to get the most out of Numexa."
+    )
+    e.add_field(name="👋 `invite`",    value=f"[Add Numexa to your server]({INVITE_URL})",   inline=False)
+    e.add_field(name="💬 `support`",   value=f"[Join The Devzone]({DEVZONE_INVITE})",         inline=False)
+    e.add_field(name="🧠 `dashboard`", value=f"[Open the web dashboard]({DASHBOARD_URL})",    inline=False)
     return e
 
 
@@ -228,17 +307,39 @@ HELP_PAGES = {
 class HelpSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label=label, value=key, emoji=label.split()[0])
+            discord.SelectOption(
+                label=label,
+                value=key,
+                emoji=label.split()[0],
+                description=self._desc(key),
+                default=(key == "overview")
+            )
             for key, (label, _) in HELP_PAGES.items()
         ]
         super().__init__(
-            placeholder="📂 Choose a category…",
+            placeholder="📂 Select a category to explore…",
             min_values=1,
             max_values=1,
             options=options,
         )
 
+    @staticmethod
+    def _desc(key: str) -> str:
+        descs = {
+            "overview":   "Start here — all categories at a glance",
+            "calculator": "calc, ui — expressions & button calculator",
+            "calculus":   "diff, integrate, dsolve — SymPy powered",
+            "settings":   "setprefix, anglemode, noprefix",
+            "counting":   "setcount, resetcount — counting game",
+            "utility":    "ping, stats, serverinfo, userinfo",
+            "links":      "invite, support, dashboard",
+        }
+        return descs.get(key, "")
+
     async def callback(self, interaction: discord.Interaction):
+        # Update the "default" highlight on the selected option
+        for opt in self.options:
+            opt.default = (opt.value == self.values[0])
         _, builder = HELP_PAGES[self.values[0]]
         await interaction.response.edit_message(embed=builder(), view=self.view)
 
@@ -247,6 +348,16 @@ class HelpView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=120)
         self.add_item(HelpSelect())
+        self.message: discord.Message | None = None
+
+    @discord.ui.button(label="🏠 Home", style=discord.ButtonStyle.secondary, row=1)
+    async def home_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Reset dropdown to overview default
+        for item in self.children:
+            if isinstance(item, HelpSelect):
+                for opt in item.options:
+                    opt.default = (opt.value == "overview")
+        await interaction.response.edit_message(embed=_help_overview(), view=self)
 
     async def on_timeout(self):
         for item in self.children:
@@ -281,7 +392,7 @@ class CalculatorView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
             await interaction.response.send_message(
-                "❌ This calculator belongs to someone else. Use `!ui` to open your own.",
+                err("This calculator belongs to someone else. Use `!ui` to open your own."),
                 ephemeral=True
             )
             return False
@@ -340,8 +451,8 @@ class CalculatorView(discord.ui.View):
     async def bequals(self, i, b):
         try:
             self.expression = safe_eval(self.expression, self.user_id)
-        except Exception as err:
-            self.expression = f"Error: {err}"
+        except Exception as e:
+            self.expression = f"Error: {e}"
         await self.update(i)
 
     # ── Row 4 — Scientific ──
@@ -368,8 +479,8 @@ async def cmd_calc(ctx, *, expr: str):
         e.add_field(name="Expression", value=f"`{expr}`",     inline=False)
         e.add_field(name="Result",     value=f"**{result}**", inline=False)
         await ctx.send(embed=e)
-    except Exception as err:
-        await ctx.send(f"❌ **Error:** `{err}`")
+    except Exception as ex:
+        await ctx.send(err(f"**Error:** `{ex}`"))
 
 @bot.command(name="diff")
 async def cmd_diff(ctx, *, expr: str):
@@ -379,8 +490,8 @@ async def cmd_diff(ctx, *, expr: str):
         e.add_field(name="f(x)",  value=f"`{expr}`",   inline=False)
         e.add_field(name="f′(x)", value=f"`{result}`", inline=False)
         await ctx.send(embed=e)
-    except Exception as err:
-        await ctx.send(f"❌ **Error:** `{err}`")
+    except Exception as ex:
+        await ctx.send(err(f"**Error:** `{ex}`"))
 
 @bot.command(name="integrate")
 async def cmd_integrate(ctx, *, expr: str):
@@ -390,8 +501,8 @@ async def cmd_integrate(ctx, *, expr: str):
         e.add_field(name="f(x)",    value=f"`{expr}`",       inline=False)
         e.add_field(name="∫f(x)dx", value=f"`{result} + C`", inline=False)
         await ctx.send(embed=e)
-    except Exception as err:
-        await ctx.send(f"❌ **Error:** `{err}`")
+    except Exception as ex:
+        await ctx.send(err(f"**Error:** `{ex}`"))
 
 @bot.command(name="dsolve")
 async def cmd_dsolve(ctx, *, eq: str):
@@ -401,8 +512,8 @@ async def cmd_dsolve(ctx, *, eq: str):
         e.add_field(name="Equation", value=f"`{eq}`",     inline=False)
         e.add_field(name="Solution", value=f"`{result}`", inline=False)
         await ctx.send(embed=e)
-    except Exception as err:
-        await ctx.send(f"❌ **Error:** `{err}`")
+    except Exception as ex:
+        await ctx.send(err(f"**Error:** `{ex}`"))
 
 @bot.command(name="ui")
 async def cmd_ui(ctx):
@@ -417,34 +528,33 @@ async def cmd_ui(ctx):
 @commands.has_permissions(administrator=True)
 async def cmd_setprefix(ctx, prefix: str):
     if len(prefix) > 5:
-        return await ctx.send("❌ Prefix must be 5 characters or fewer.")
-        return
+        return await ctx.send(err("Prefix must be 5 characters or fewer."))
     custom_prefixes[ctx.guild.id]        = prefix
     data["prefixes"][str(ctx.guild.id)]  = prefix
     save_data()
-    await ctx.send(f"✅ Prefix set to `{prefix}`")
+    await ctx.send(ok(f"Prefix set to `{prefix}`"))
 
 @bot.command(name="anglemode")
 async def cmd_anglemode(ctx, mode: str):
     mode = mode.lower()
     if mode not in ("deg", "rad"):
-        return await ctx.send("❌ Use `deg` or `rad`.")
+        return await ctx.send(err("Use `deg` or `rad`."))
     angle_mode[ctx.author.id]             = mode
     data["angle"][str(ctx.author.id)]     = mode
     save_data()
     label = "Degrees 🔺" if mode == "deg" else "Radians 〰️"
-    await ctx.send(f"✅ Angle mode set to **{label}**")
+    await ctx.send(ok(f"Angle mode set to **{label}**"))
 
 @bot.command(name="noprefix")
 async def cmd_noprefix(ctx, member: discord.Member):
     if not is_owner(ctx.author.id):
-        return await ctx.send("❌ Only the bot owner can use this command.")
+        return await ctx.send(err("Only the bot owner can use this command."))
     if member.id in no_prefix_users:
         no_prefix_users.discard(member.id)
-        msg = f"✅ Removed no-prefix from {member.mention}."
+        msg = ok(f"Removed no-prefix from {member.mention}.")
     else:
         no_prefix_users.add(member.id)
-        msg = f"✅ {member.mention} can now use commands without a prefix."
+        msg = ok(f"{member.mention} can now use commands without a prefix.")
     data["noprefix"] = list(no_prefix_users)
     save_data()
     await ctx.send(msg)
@@ -457,7 +567,7 @@ async def cmd_setcount(ctx):
     gid = str(ctx.guild.id)
     data["counting"][gid] = {"channel": ctx.channel.id, "current": 0, "last_user": None}
     save_data()
-    await ctx.send(f"✅ Counting channel set to {ctx.channel.mention}. Start counting from **1**!")
+    await ctx.send(ok(f"Counting channel set to {ctx.channel.mention}. Start counting from **1**!"))
 
 @bot.command(name="resetcount")
 @commands.has_permissions(administrator=True)
@@ -469,7 +579,7 @@ async def cmd_resetcount(ctx):
         save_data()
         await ctx.send("🔄 Count reset to **0**. Start again from **1**!")
     else:
-        await ctx.send("❌ No counting channel set for this server.")
+        await ctx.send(err("No counting channel set for this server."))
 
 
 # ── Utility ───────────────────────────────────────────────────────
@@ -493,7 +603,7 @@ async def cmd_stats(ctx):
 @bot.command(name="serverinfo")
 async def cmd_serverinfo(ctx):
     if not ctx.guild:
-        return await ctx.send("❌ This command can only be used in a server.")
+        return await ctx.send(err("This command can only be used in a server."))
     g = ctx.guild
     e = numexa_embed(f"🏠 {g.name}")
     e.set_thumbnail(url=g.icon.url if g.icon else None)
@@ -560,8 +670,8 @@ async def slash_calc(i: discord.Interaction, expr: str):
         e.add_field(name="Expression", value=f"`{expr}`",     inline=False)
         e.add_field(name="Result",     value=f"**{result}**", inline=False)
         await i.response.send_message(embed=e)
-    except Exception as err:
-        await i.response.send_message(f"❌ **Error:** `{err}`", ephemeral=True)
+    except Exception as ex:
+        await i.response.send_message(err(f"**Error:** `{ex}`"), ephemeral=True)
 
 @bot.tree.command(name="diff", description="Differentiate an expression w.r.t. x")
 @app_commands.describe(expr="Expression to differentiate (e.g. x**3 + 2*x)")
@@ -572,8 +682,8 @@ async def slash_diff(i: discord.Interaction, expr: str):
         e.add_field(name="f(x)",  value=f"`{expr}`",   inline=False)
         e.add_field(name="f′(x)", value=f"`{result}`", inline=False)
         await i.response.send_message(embed=e)
-    except Exception as err:
-        await i.response.send_message(f"❌ **Error:** `{err}`", ephemeral=True)
+    except Exception as ex:
+        await i.response.send_message(err(f"**Error:** `{ex}`"), ephemeral=True)
 
 @bot.tree.command(name="integrate", description="Integrate an expression w.r.t. x")
 @app_commands.describe(expr="Expression to integrate (e.g. x**2 + 3*x)")
@@ -584,8 +694,8 @@ async def slash_integrate(i: discord.Interaction, expr: str):
         e.add_field(name="f(x)",    value=f"`{expr}`",       inline=False)
         e.add_field(name="∫f(x)dx", value=f"`{result} + C`", inline=False)
         await i.response.send_message(embed=e)
-    except Exception as err:
-        await i.response.send_message(f"❌ **Error:** `{err}`", ephemeral=True)
+    except Exception as ex:
+        await i.response.send_message(err(f"**Error:** `{ex}`"), ephemeral=True)
 
 @bot.tree.command(name="dsolve", description="Solve a differential equation")
 @app_commands.describe(eq="Differential equation (e.g. f(x).diff(x) - f(x))")
@@ -596,8 +706,8 @@ async def slash_dsolve(i: discord.Interaction, eq: str):
         e.add_field(name="Equation", value=f"`{eq}`",     inline=False)
         e.add_field(name="Solution", value=f"`{result}`", inline=False)
         await i.response.send_message(embed=e)
-    except Exception as err:
-        await i.response.send_message(f"❌ **Error:** `{err}`", ephemeral=True)
+    except Exception as ex:
+        await i.response.send_message(err(f"**Error:** `{ex}`"), ephemeral=True)
 
 @bot.tree.command(name="ui", description="Open the interactive button calculator")
 async def slash_ui(i: discord.Interaction):
@@ -613,15 +723,15 @@ async def slash_ui(i: discord.Interaction):
 @app_commands.describe(prefix="New prefix (max 5 characters)")
 async def slash_setprefix(i: discord.Interaction, prefix: str):
     if not i.guild:
-        return await i.response.send_message("❌ Server-only command.", ephemeral=True)
+        return await i.response.send_message(err("Server-only command."), ephemeral=True)
     if not i.user.guild_permissions.administrator:
-        return await i.response.send_message("❌ Administrator permission required.", ephemeral=True)
+        return await i.response.send_message(err("Administrator permission required."), ephemeral=True)
     if len(prefix) > 5:
-        return await i.response.send_message("❌ Prefix must be 5 characters or fewer.", ephemeral=True)
+        return await i.response.send_message(err("Prefix must be 5 characters or fewer."), ephemeral=True)
     custom_prefixes[i.guild.id]         = prefix
     data["prefixes"][str(i.guild.id)]   = prefix
     save_data()
-    await i.response.send_message(f"✅ Prefix set to `{prefix}`", ephemeral=True)
+    await i.response.send_message(ok(f"Prefix set to `{prefix}`"), ephemeral=True)
 
 @bot.tree.command(name="anglemode", description="Set your trig angle unit")
 @app_commands.describe(mode="deg for degrees, rad for radians")
@@ -634,19 +744,19 @@ async def slash_anglemode(i: discord.Interaction, mode: str):
     data["angle"][str(i.user.id)]     = mode
     save_data()
     label = "Degrees 🔺" if mode == "deg" else "Radians 〰️"
-    await i.response.send_message(f"✅ Angle mode set to **{label}**", ephemeral=True)
+    await i.response.send_message(ok(f"Angle mode set to **{label}**"), ephemeral=True)
 
 @bot.tree.command(name="noprefix", description="Toggle no-prefix mode for a user (owner only)")
 @app_commands.describe(member="The member to toggle no-prefix for")
 async def slash_noprefix(i: discord.Interaction, member: discord.Member):
     if not is_owner(i.user.id):
-        return await i.response.send_message("❌ Owner only.", ephemeral=True)
+        return await i.response.send_message(err("Owner only."), ephemeral=True)
     if member.id in no_prefix_users:
         no_prefix_users.discard(member.id)
-        msg = f"✅ Removed no-prefix from {member.mention}."
+        msg = ok(f"Removed no-prefix from {member.mention}.")
     else:
         no_prefix_users.add(member.id)
-        msg = f"✅ {member.mention} can now use commands without a prefix."
+        msg = ok(f"{member.mention} can now use commands without a prefix.")
     data["noprefix"] = list(no_prefix_users)
     save_data()
     await i.response.send_message(msg, ephemeral=True)
@@ -656,22 +766,22 @@ async def slash_noprefix(i: discord.Interaction, member: discord.Member):
 @bot.tree.command(name="setcount", description="Set this channel as the counting channel (admin only)")
 async def slash_setcount(i: discord.Interaction):
     if not i.guild:
-        return await i.response.send_message("❌ Server-only command.", ephemeral=True)
+        return await i.response.send_message(err("Server-only command."), ephemeral=True)
     if not i.user.guild_permissions.administrator:
-        return await i.response.send_message("❌ Administrator permission required.", ephemeral=True)
+        return await i.response.send_message(err("Administrator permission required."), ephemeral=True)
     gid = str(i.guild.id)
     data["counting"][gid] = {"channel": i.channel.id, "current": 0, "last_user": None}
     save_data()
     await i.response.send_message(
-        f"✅ Counting channel set to {i.channel.mention}. Start from **1**!", ephemeral=True
+        ok(f"Counting channel set to {i.channel.mention}. Start from **1**!"), ephemeral=True
     )
 
 @bot.tree.command(name="resetcount", description="Reset the counting game to 0 (admin only)")
 async def slash_resetcount(i: discord.Interaction):
     if not i.guild:
-        return await i.response.send_message("❌ Server-only command.", ephemeral=True)
+        return await i.response.send_message(err("Server-only command."), ephemeral=True)
     if not i.user.guild_permissions.administrator:
-        return await i.response.send_message("❌ Administrator permission required.", ephemeral=True)
+        return await i.response.send_message(err("Administrator permission required."), ephemeral=True)
     gid = str(i.guild.id)
     if gid in data["counting"]:
         data["counting"][gid]["current"]   = 0
@@ -679,7 +789,7 @@ async def slash_resetcount(i: discord.Interaction):
         save_data()
         await i.response.send_message("🔄 Count reset to **0**. Start again from **1**!", ephemeral=True)
     else:
-        await i.response.send_message("❌ No counting channel set.", ephemeral=True)
+        await i.response.send_message(err("No counting channel set."), ephemeral=True)
 
 
 # ── Utility ───────────────────────────────────────────────────────
@@ -703,7 +813,7 @@ async def slash_stats(i: discord.Interaction):
 @bot.tree.command(name="serverinfo", description="View server information")
 async def slash_serverinfo(i: discord.Interaction):
     if not i.guild:
-        return await i.response.send_message("❌ Server-only command.", ephemeral=True)
+        return await i.response.send_message(err("Server-only command."), ephemeral=True)
     g = i.guild
     e = numexa_embed(f"🏠 {g.name}")
     e.set_thumbnail(url=g.icon.url if g.icon else None)
@@ -785,11 +895,11 @@ async def on_guild_join(guild):
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don't have permission to use this command.")
+        await ctx.send(err("You don't have permission to use this command."))
     elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing argument: `{error.param.name}`")
+        await ctx.send(err(f"Missing argument: `{error.param.name}`"))
     elif isinstance(error, commands.BadArgument):
-        await ctx.send(f"❌ Bad argument: {error}")
+        await ctx.send(err(f"Bad argument: {error}"))
     elif isinstance(error, commands.CommandNotFound):
         pass
     else:
@@ -817,7 +927,7 @@ async def on_message(message):
             save_data()
             await message.add_reaction(cross_emoji)
             await message.channel.send(
-                f"❌ {message.author.mention} broke the count! "
+                f"{cross_emoji} {message.author.mention} broke the count! "
                 f"Only numbers allowed. Start again from **1**.",
                 delete_after=8
             )
@@ -833,7 +943,7 @@ async def on_message(message):
             save_data()
             await message.add_reaction(cross_emoji)
             await message.channel.send(
-                f"❌ {message.author.mention} can't count twice in a row! "
+                f"{cross_emoji} {message.author.mention} can't count twice in a row! "
                 f"Start again from **1**.",
                 delete_after=8
             )
@@ -846,7 +956,7 @@ async def on_message(message):
             save_data()
             await message.add_reaction(cross_emoji)
             await message.channel.send(
-                f"❌ {message.author.mention} said **{number}** but the next number was **{expected}**! "
+                f"{cross_emoji} {message.author.mention} said **{number}** but the next number was **{expected}**! "
                 f"Start again from **1**.",
                 delete_after=8
             )
