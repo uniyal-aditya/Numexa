@@ -8,6 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 import sympy as sp
 import math, json, os, itertools, asyncio, time, io, random
+from pymongo import MongoClient
 from simpleeval import simple_eval
 import matplotlib
 matplotlib.use("Agg")
@@ -20,7 +21,7 @@ OWNER_ID         = 800553680704110624
 EXTRA_OWNERS     = set()  # add extra owner IDs here if needed
 ALL_OWNERS       = EXTRA_OWNERS | {OWNER_ID}
 DEFAULT_PREFIX   = "!"
-DATA_FILE        = "bot_data.json"
+MONGO_URI        = os.getenv("MONGO_URI")
 CHECK_EMOJI_ID   = 1460832001723732139
 CROSS_EMOJI_ID   = 1460831985428594789
 DEVZONE_INVITE   = "https://discord.gg/SmSx4uvVCD"
@@ -69,18 +70,46 @@ def ok(msg: str)  -> str: return f"{CHECK()} {msg}"
 def err(msg: str) -> str: return f"{CROSS()} {msg}"
 
 
-# ───────────────────────── DATA STORAGE ───────────────────────────
+# ───────────────────────── DATA STORAGE (MongoDB) ─────────────────
+# Single document in collection "botdata" with _id="main"
+# Falls back to in-memory dict if MONGO_URI is not set (local dev)
+
+_DEFAULTS = {
+    "_id":       "main",
+    "prefixes":  {},
+    "noprefix":  [],
+    "angle":     {},
+    "counting":  {},
+    "premium":   {},
+    "history":   {},
+    "bookmarks": {},
+    "daily":     {},
+}
+
+if MONGO_URI:
+    _mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    _db           = _mongo_client["numexa"]
+    _col          = _db["botdata"]
+    print("MongoDB: connected")
+else:
+    _mongo_client = None
+    _col          = None
+    print("MongoDB: MONGO_URI not set — using in-memory storage (data will reset on restart)")
+
 def load_data() -> dict:
-    if not os.path.exists(DATA_FILE):
-        return {"prefixes": {}, "noprefix": [], "angle": {},
-                "counting": {}, "premium": {}, "history": {},
-                "bookmarks": {}, "daily": {}}
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+    if _col is not None:
+        doc = _col.find_one({"_id": "main"})
+        if doc:
+            return doc
+        # First run — insert defaults
+        _col.insert_one(_DEFAULTS.copy())
+        return _DEFAULTS.copy()
+    return _DEFAULTS.copy()
 
 def save_data():
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+    if _col is not None:
+        _col.replace_one({"_id": "main"}, data, upsert=True)
+    # If no MongoDB, data lives in memory only (acceptable for local dev)
 
 data = load_data()
 
