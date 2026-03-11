@@ -17,7 +17,7 @@ import numpy as np
 # ───────────────────────────── CONFIG ─────────────────────────────
 TOKEN            = os.getenv("TOKEN")
 OWNER_ID         = 800553680704110624
-EXTRA_OWNERS     = {111111111111111111}
+EXTRA_OWNERS     = set()  # add extra owner IDs here if needed
 ALL_OWNERS       = EXTRA_OWNERS | {OWNER_ID}
 DEFAULT_PREFIX   = "!"
 DATA_FILE        = "bot_data.json"
@@ -131,18 +131,21 @@ def is_premium(guild_id: int) -> bool:
 
 def has_premium_access(ctx_or_interaction) -> bool:
     """
-    True if the server has active premium OR the caller is the bot owner.
-    Owner (Aditya) can use all premium commands on any server, always.
+    True if:
+    - caller is OWNER_ID (Aditya) — always allowed, any server, no premium needed
+    - OR the server has an active premium subscription
     """
     if isinstance(ctx_or_interaction, commands.Context):
         user_id  = ctx_or_interaction.author.id
         guild_id = ctx_or_interaction.guild.id if ctx_or_interaction.guild else None
     else:
         user_id  = ctx_or_interaction.user.id
-        guild_id = ctx_or_interaction.guild_id
+        guild_id = getattr(ctx_or_interaction, "guild_id", None)
 
-    if user_id in ALL_OWNERS:
+    # Owner bypass — always first
+    if user_id == OWNER_ID:
         return True
+    # Server premium check
     if guild_id and is_premium(guild_id):
         return True
     return False
@@ -811,7 +814,7 @@ async def cmd_premiumlist(ctx):
 # ── 1. Graph Plotting ─────────────────────────────────────────────
 @bot.command(name="plot")
 async def cmd_plot(ctx, *, expr: str):
-    if not ctx.guild or not has_premium_access(ctx):
+    if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     try:
         x_vals = np.linspace(-10, 10, 800)
@@ -855,7 +858,7 @@ async def cmd_plot(ctx, *, expr: str):
 # ── 2. Calculation History ────────────────────────────────────────
 @bot.command(name="history")
 async def cmd_history(ctx):
-    if not ctx.guild or not has_premium_access(ctx):
+    if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     hist = data["history"].get(str(ctx.guild.id), [])
     if not hist:
@@ -882,7 +885,7 @@ async def cmd_matrix(ctx, operation: str, *, data_str: str):
     !matrix add 1,2|3,4 + 5,6|7,8
     !matrix mul 1,2|3,4 * 5,6|7,8
     """
-    if not ctx.guild or not has_premium_access(ctx):
+    if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
 
     def parse_matrix(s: str):
@@ -919,7 +922,7 @@ async def cmd_matrix(ctx, operation: str, *, data_str: str):
 # ── 4. Step-by-step Differentiation ──────────────────────────────
 @bot.command(name="stepdiff")
 async def cmd_stepdiff(ctx, *, expr: str):
-    if not ctx.guild or not has_premium_access(ctx):
+    if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     try:
         sym_expr = sp.sympify(expr)
@@ -937,7 +940,7 @@ async def cmd_stepdiff(ctx, *, expr: str):
 # ── 5. Step-by-step Integration ───────────────────────────────────
 @bot.command(name="stepint")
 async def cmd_stepint(ctx, *, expr: str):
-    if not ctx.guild or not has_premium_access(ctx):
+    if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     try:
         sym_expr = sp.sympify(expr)
@@ -956,7 +959,7 @@ async def cmd_stepint(ctx, *, expr: str):
 @bot.command(name="setmilestone")
 @commands.has_permissions(administrator=True)
 async def cmd_setmilestone(ctx, count: int, role: discord.Role):
-    if not ctx.guild or not has_premium_access(ctx):
+    if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     gid = str(ctx.guild.id)
     if gid not in data["counting"]:
@@ -985,7 +988,7 @@ async def cmd_milestones(ctx):
 @bot.command(name="setdaily")
 @commands.has_permissions(administrator=True)
 async def cmd_setdaily(ctx):
-    if not ctx.guild or not has_premium_access(ctx):
+    if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     data["daily"][str(ctx.guild.id)] = {"channel": ctx.channel.id, "last_sent": ""}
     save_data()
@@ -1010,7 +1013,7 @@ async def cmd_bookmark(ctx, action: str, name: str = None, *, expr: str = None):
     !bookmark use <name>
     !bookmark delete <name>
     """
-    if not ctx.guild or not has_premium_access(ctx):
+    if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
 
     uid = str(ctx.author.id)
@@ -1060,7 +1063,7 @@ async def cmd_bookmark(ctx, action: str, name: str = None, *, expr: str = None):
 @bot.command(name="botnick")
 @commands.has_permissions(administrator=True)
 async def cmd_botnick(ctx, *, nick: str = None):
-    if not ctx.guild or not has_premium_access(ctx):
+    if not has_premium_access(ctx):
         return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
     try:
         await ctx.guild.me.edit(nick=nick)
@@ -1068,6 +1071,16 @@ async def cmd_botnick(ctx, *, nick: str = None):
     except discord.Forbidden:
         await ctx.send(err("I don't have permission to change my nickname."))
 
+
+
+@bot.command(name="sync")
+async def cmd_sync(ctx):
+    """Force re-sync all slash commands (owner only)."""
+    if not is_owner(ctx.author.id):
+        return await ctx.send(err("Owner only."))
+    await ctx.send("⏳ Syncing slash commands...")
+    synced = await bot.tree.sync()
+    await ctx.send(ok(f"Synced **{len(synced)}** slash commands globally."))
 
 # ═══════════════════════ SLASH COMMANDS ═══════════════════════════
 
@@ -1493,7 +1506,9 @@ async def status_loop():
 
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
+    # Sync slash commands globally (may take up to 1 hour to propagate)
+    synced = await bot.tree.sync()
+    print(f"   Synced  : {len(synced)} slash commands globally")
     asyncio.create_task(status_loop())
     asyncio.create_task(daily_problem_loop())
 
