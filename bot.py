@@ -913,6 +913,42 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
+    # ── @Numexa mention-only → send about embed ───────────────────
+    if bot.user in message.mentions and message.content.strip() in (
+        f"<@{bot.user.id}>", f"<@!{bot.user.id}>"
+    ):
+        latency = round(bot.latency * 1000)
+        owner   = await bot.fetch_user(OWNER_ID)          # Aditya
+        e = discord.Embed(
+            title="👋 Hey there! I'm Numexa",
+            description=(
+                f"I'm a **scientific Discord calculator bot** built to make math feel effortless.\n\n"
+                f"Whether you need to evaluate expressions, solve calculus problems, or run a "
+                f"fun counting game in your server — I've got you covered!\n\n"
+                f"Use `!help` or `/help` to explore all my commands."
+            ),
+            color=BOT_COLOR
+        )
+        e.set_thumbnail(url=bot.user.display_avatar.url)
+        e.add_field(name="🧮 Calculator",  value="Evaluate math expressions",        inline=True)
+        e.add_field(name="📐 Calculus",    value="Derivatives, integrals & more",    inline=True)
+        e.add_field(name="🔢 Counting",    value="Server counting game",             inline=True)
+        e.add_field(name="⚙️ Settings",    value="Prefix & angle mode",             inline=True)
+        e.add_field(name="🏓 Ping",        value=f"`{latency}ms`",                   inline=True)
+        e.add_field(name="🌐 Dashboard",   value=f"[Open]({DASHBOARD_URL})",         inline=True)
+        e.set_footer(
+            text=f"Made with 💜 by Aditya  •  {owner}",
+            icon_url=owner.display_avatar.url if owner else None
+        )
+        v = discord.ui.View()
+        v.add_item(discord.ui.Button(label="Add Numexa",   style=discord.ButtonStyle.link, url=INVITE_URL))
+        v.add_item(discord.ui.Button(label="Join Devzone", style=discord.ButtonStyle.link, url=DEVZONE_INVITE))
+        v.add_item(discord.ui.Button(label="Dashboard",    style=discord.ButtonStyle.link, url=DASHBOARD_URL))
+        await message.reply(embed=e, view=v, mention_author=False)
+        # Also ping the owner so Aditya gets notified
+        await message.channel.send(f"<@{OWNER_ID}>", delete_after=1)
+        return
+
     gid      = str(message.guild.id)
     counting = data["counting"].get(gid)
 
