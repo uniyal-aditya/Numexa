@@ -21,8 +21,10 @@ EXTRA_OWNERS     = {111111111111111111}          # replace with real IDs
 ALL_OWNERS       = EXTRA_OWNERS | {OWNER_ID}
 DEFAULT_PREFIX   = "!"
 DATA_FILE        = "bot_data.json"
-CHECK_EMOJI_ID   = 1460663385472503874
-CROSS_EMOJI_ID   = 1460663471623504185
+# Emoji IDs below are only used for reaction add in the counting game
+# (reactions require an emoji object, not a string)
+CHECK_EMOJI_ID   = 1460832001723732139   # application emoji — works on every server
+CROSS_EMOJI_ID   = 1460831985428594789   # application emoji — works on every server
 DEVZONE_INVITE   = "https://discord.gg/SmSx4uvVCD"
 INVITE_URL       = (
     "https://discord.com/oauth2/authorize"
@@ -30,17 +32,19 @@ INVITE_URL       = (
     "&permissions=5629501681765440"
     "&scope=bot+applications.commands"
 )
-DASHBOARD_URL    = "https://numexa.vercel.app"
+DASHBOARD_URL    = "https://numexa.netlify.app"
 BOT_COLOR        = 0x8A2BE2
 START_TIME       = time.time()
 
-# Custom emoji helpers — used everywhere instead of plain ✅ / ❌
-def CHECK(bot):
-    e = bot.get_emoji(CHECK_EMOJI_ID)
+# Application emoji cache — loaded once on_ready, works on every server
+_app_emojis: dict = {}
+
+def CHECK() -> str:
+    e = _app_emojis.get("checkmark")
     return str(e) if e else "✅"
 
-def CROSS(bot):
-    e = bot.get_emoji(CROSS_EMOJI_ID)
+def CROSS() -> str:
+    e = _app_emojis.get("wrong")
     return str(e) if e else "❌"
 
 
@@ -139,16 +143,10 @@ def uptime_str() -> str:
     return f"{h}h {m}m {s}s"
 
 def ok(msg: str) -> str:
-    """Success message using custom check emoji."""
-    e = bot.get_emoji(CHECK_EMOJI_ID)
-    emoji = str(e) if e else "✅"
-    return f"{emoji} {msg}"
+    return f"{CHECK()} {msg}"
 
 def err(msg: str) -> str:
-    """Error message using custom cross emoji."""
-    e = bot.get_emoji(CROSS_EMOJI_ID)
-    emoji = str(e) if e else "❌"
-    return f"{emoji} {msg}"
+    return f"{CROSS()} {msg}"
 
 
 # ─────────────────────── HELP MENU SYSTEM ─────────────────────────
@@ -156,22 +154,16 @@ def err(msg: str) -> str:
 def _help_overview() -> discord.Embed:
     e = numexa_embed(
         "📘 Numexa — Help Menu",
-        "Welcome to **Numexa**, your scientific Discord calculator!\n\n"
-        "Use the **dropdown below** to browse command categories.\n"
-        "Both prefix (`!`) and slash (`/`) commands are supported."
+        "Your scientific Discord calculator.\n"
+        "Pick a category below to explore commands.\n"
+        "Supports both `!` prefix and `/` slash commands."
     )
-    e.add_field(
-        name="📂 Available Categories",
-        value=(
-            "> 🧮 **Calculator** — Evaluate expressions & interactive UI\n"
-            "> 📐 **Calculus** — Derivatives, integrals & differential equations\n"
-            "> ⚙️ **Settings** — Prefix, angle mode & no-prefix\n"
-            "> 🔢 **Counting** — Server counting game setup\n"
-            "> 🛠️ **Utility** — Ping, stats, serverinfo, userinfo\n"
-            "> 🔗 **Links** — Invite, support & dashboard"
-        ),
-        inline=False
-    )
+    e.add_field(name="🧮 Calculator", value="Math & expressions",      inline=True)
+    e.add_field(name="📐 Calculus",   value="Diff, integrate & more",  inline=True)
+    e.add_field(name="⚙️ Settings",   value="Prefix & angle mode",     inline=True)
+    e.add_field(name="🔢 Counting",   value="Server counting game",    inline=True)
+    e.add_field(name="🛠️ Utility",    value="Stats, info & ping",      inline=True)
+    e.add_field(name="🔗 Links",      value="Invite, support & more",  inline=True)
     e.set_thumbnail(url="https://numexa.netlify.app/favicon.ico")
     return e
 
@@ -954,8 +946,8 @@ async def on_message(message):
 
     if counting and message.channel.id == counting["channel"]:
         content     = message.content.strip()
-        check_emoji = f"<:checkmark:{CHECK_EMOJI_ID}>"
-        cross_emoji = f"<:wrong:{CROSS_EMOJI_ID}>"
+        check_emoji = _app_emojis.get("checkmark") or f"<:checkmark:{CHECK_EMOJI_ID}>"
+        cross_emoji = _app_emojis.get("wrong")     or f"<:wrong:{CROSS_EMOJI_ID}>"
 
         if not content.isdigit():
             counting["current"]   = 0
@@ -1025,6 +1017,16 @@ async def status_loop():
 async def on_ready():
     await bot.tree.sync()
     asyncio.create_task(status_loop())
+
+    # Load application emojis into cache so they work on every server
+    try:
+        app_emoji_list = await bot.fetch_application_emojis()
+        for emoji in app_emoji_list:
+            _app_emojis[emoji.name] = emoji
+        print(f"   Emojis : loaded {len(_app_emojis)} application emoji(s): {list(_app_emojis.keys())}")
+    except Exception as e:
+        print(f"   Emojis : failed to load — {e}")
+
     print(f"✅ Logged in as {bot.user} ({bot.user.id})")
     print(f"   Guilds : {len(bot.guilds)}")
     print(f"   Prefix : {DEFAULT_PREFIX}")
@@ -1035,4 +1037,3 @@ if not TOKEN:
     raise RuntimeError("TOKEN environment variable is not set.")
 
 bot.run(TOKEN)
-
