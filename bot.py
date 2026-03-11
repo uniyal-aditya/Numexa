@@ -30,7 +30,7 @@ INVITE_URL       = (
     "&permissions=5629501681765440"
     "&scope=bot+applications.commands"
 )
-DASHBOARD_URL    = "https://numexa.netlify.app"
+DASHBOARD_URL    = "https://numexa.vercel.app"
 BOT_COLOR        = 0x8A2BE2
 START_TIME       = time.time()
 
@@ -1035,3 +1035,4 @@ if not TOKEN:
     raise RuntimeError("TOKEN environment variable is not set.")
 
 bot.run(TOKEN)
+
