@@ -36,6 +36,8 @@ BOT_COLOR        = 0x8A2BE2
 PREMIUM_COLOR    = 0xFFD700
 START_TIME       = time.time()
 TRIAL_DAYS       = 7
+VOTE_URL         ="https://top.gg/bot/1460289617264775333/vote"
+REVIEW_URL       ="https://top.gg/bot/1460289617264775333#reviews"
 
 DAILY_PROBLEMS = [
     ("Differentiate f(x) = x³ + 2x² − 5x + 1", "3x² + 4x − 5"),
@@ -341,6 +343,8 @@ def _help_links() -> discord.Embed:
     e.add_field(name="👋 `invite`",    value=f"[Add Numexa]({INVITE_URL})",           inline=False)
     e.add_field(name="💬 `support`",   value=f"[Join The Devzone]({DEVZONE_INVITE})", inline=False)
     e.add_field(name="🧠 `dashboard`", value=f"[Web Dashboard]({DASHBOARD_URL})",     inline=False)
+    e.add_field(name="🧠 `vote`", value=f"[Vote for Numexa]({VOTE_URL})",     inline=False)
+    e.add_field(name="🧠 `review`", value=f"[Review Numexa]({REVIEW_URL})",     inline=False)
     return e
 
 def _help_premium() -> discord.Embed:
@@ -728,6 +732,20 @@ async def cmd_invite(ctx):
     e = numexa_embed("👋 Invite Numexa", "Click below to add me to your server!")
     v = discord.ui.View()
     v.add_item(discord.ui.Button(label="Add Numexa", style=discord.ButtonStyle.link, url=INVITE_URL))
+    await ctx.send(embed=e, view=v)
+
+@bot.command(name="vote")
+async def cmd_vote(ctx):
+    e = numexa_embed("� Vote for Numexa", "Click below to vote for Numexa on Top.gg!")
+    v = discord.ui.View()
+    v.add_item(discord.ui.Button(label="Vote for Numexa", style=discord.ButtonStyle.link, url=VOTE_URL))
+    await ctx.send(embed=e, view=v)
+
+@bot.command(name="review")
+async def cmd_review(ctx):
+    e = numexa_embed(" Review Numexa", "Click below to review Numexa on Top.gg!")
+    v = discord.ui.View()
+    v.add_item(discord.ui.Button(label="Review Numexa", style=discord.ButtonStyle.link, url=REVIEW_URL))
     await ctx.send(embed=e, view=v)
 
 
@@ -1376,7 +1394,19 @@ async def slash_dashboard(i: discord.Interaction):
     v.add_item(discord.ui.Button(label="Open Dashboard", style=discord.ButtonStyle.link, url=DASHBOARD_URL))
     await i.response.send_message(embed=e, view=v, ephemeral=True)
 
+@bot.tree.command(name="vote", description="Get the vote link")
+async def slash_vote(i: discord.Interaction):
+    e = numexa_embed("� Vote for Numexa", "Click below to vote for Numexa on Top.gg!")
+    v = discord.ui.View()
+    v.add_item(discord.ui.Button(label="Vote for Numexa", style=discord.ButtonStyle.link, url=VOTE_URL))
+    await i.response.send_message(embed=e, view=v, ephemeral=True)
 
+@bot.tree.command(name="review", description="Get the review link")
+async def slash_review(i: discord.Interaction):
+    e = numexa_embed("� Review Numexa", "Click below to review Numexa on Top.gg!")
+    v = discord.ui.View()
+    v.add_item(discord.ui.Button(label="Review Numexa", style=discord.ButtonStyle.link, url=REVIEW_URL))
+    await i.response.send_message(embed=e, view=v, ephemeral=True)
 
 @bot.tree.command(name="grantpremium", description="Grant premium to a server (bot owner only)")
 @app_commands.describe(guild_id="The server ID to grant premium to", days="Number of days (leave empty for lifetime)")
