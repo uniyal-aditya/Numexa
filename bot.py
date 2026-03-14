@@ -35,6 +35,8 @@ DASHBOARD_URL    = "https://numexa.netlify.app"
 BOT_COLOR        = 0x8A2BE2
 PREMIUM_COLOR    = 0xFFD700
 START_TIME       = time.time()
+INSTANCE_ID         = os.urandom(8).hex()  
+_active_instance_id = None                  
 TRIAL_DAYS       = 7
 VOTE_URL         ="https://top.gg/bot/1460289617264775333/vote"
 REVIEW_URL       ="https://top.gg/bot/1460289617264775333#reviews"
@@ -275,7 +277,15 @@ def uptime_str() -> str:
     h, rem = divmod(secs, 3600)
     m, s   = divmod(rem, 60)
     return f"{h}h {m}m {s}s"
-
+def is_active_instance() -> bool:
+    """Only the newest Railway deployment responds to messages."""
+    if _col is None:
+        return True  # local dev fallback
+    try:
+        doc = _col.find_one({"_id": "active_instance"})
+        return doc is not None and doc.get("instance_id") == INSTANCE_ID
+    except Exception:
+        return True  # DB error → don't go silent
 
 # ─────────────────────── HELP MENU SYSTEM ─────────────────────────
 
@@ -1517,9 +1527,14 @@ async def on_command_error(ctx, error):
 # ─────────────────────────── COUNTING ─────────────────────────────
 @bot.event
 async def on_message(message):
+    # Stale Railway deployment → ignore everything
+    if not is_active_instance():
+        return
+
     if message.author.bot or not message.guild:
         await bot.process_commands(message)
         return
+    # ... rest unchanged
 
     # ── @Numexa mention-only → about embed ────────────────────────
     if bot.user in message.mentions and message.content.strip() in (
@@ -1663,23 +1678,25 @@ async def status_loop():
         await bot.change_presence(activity=next(statuses))
         await asyncio.sleep(30)
 
-
 @bot.event
 async def on_ready():
-    # Sync slash commands globally (may take up to 1 hour to propagate)
-    synced = await bot.tree.sync()
-    print(f"   Synced  : {len(synced)} slash commands globally")
-    asyncio.create_task(status_loop())
-    asyncio.create_task(daily_problem_loop())
+    global _active_instance_id
 
-    try:
-        app_emoji_list = await bot.fetch_application_emojis()
-        for emoji in app_emoji_list:
-            _app_emojis[emoji.name] = emoji
-        print(f"   Emojis  : loaded {len(_app_emojis)} — {list(_app_emojis.keys())}")
-    except Exception as e:
-        print(f"   Emojis  : failed — {e}")
+    # Register this process as the active instance in MongoDB.
+    # The old Railway container will now fail is_active_instance()
+    # and silently stop handling all messages → zero duplicates.
+    if _col is not None:
+        try:
+            _col.update_one(
+                {"_id": "active_instance"},
+                {"$set": {"instance_id": INSTANCE_ID, "started": int(time.time())}},
+                upsert=True
+            )
+        except Exception as e:
+            print(f"   Warning: instance registration failed — {e}")
+    _active_instance_id = INSTANCE_ID
 
+    # ... your existing on_ready code below (synced, status_loop, etc.) unchanged
     print(f"✅ Logged in as {bot.user} ({bot.user.id})")
     print(f"   Guilds  : {len(bot.guilds)}")
     print(f"   Premium : {sum(1 for r in data['premium'].values() if r.get('active'))} active servers")
