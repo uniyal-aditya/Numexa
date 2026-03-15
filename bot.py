@@ -25,6 +25,7 @@ MONGO_URI        = os.getenv("MONGO_URI")
 CHECK_EMOJI_ID   = 1460832001723732139
 CROSS_EMOJI_ID   = 1460831985428594789
 DEVZONE_INVITE   = "https://discord.gg/SmSx4uvVCD"
+TICKET_URL       = "https://discord.com/channels/1434913981566287934/1461032579766550539"
 INVITE_URL       = (
     "https://discord.com/oauth2/authorize"
     "?client_id=1460289617264775333"
@@ -35,11 +36,11 @@ DASHBOARD_URL    = "https://numexa.netlify.app"
 BOT_COLOR        = 0x8A2BE2
 PREMIUM_COLOR    = 0xFFD700
 START_TIME       = time.time()
-INSTANCE_ID         = os.urandom(8).hex()  
-_active_instance_id = None                  
+INSTANCE_ID         = os.urandom(8).hex()
+_active_instance_id = None
 TRIAL_DAYS       = 7
-VOTE_URL         ="https://top.gg/bot/1460289617264775333/vote"
-REVIEW_URL       ="https://top.gg/bot/1460289617264775333#reviews"
+VOTE_URL         = "https://top.gg/bot/1460289617264775333/vote"
+REVIEW_URL       = "https://top.gg/bot/1460289617264775333#reviews"
 
 DAILY_PROBLEMS = [
     ("Differentiate f(x) = x³ + 2x² − 5x + 1", "3x² + 4x − 5"),
@@ -75,9 +76,6 @@ def err(msg: str) -> str: return f"{CROSS()} {msg}"
 
 
 # ───────────────────────── DATA STORAGE (MongoDB) ─────────────────
-# Single document in collection "botdata" with _id="main"
-# Falls back to in-memory dict if MONGO_URI is not set (local dev)
-
 _DEFAULTS = {
     "_id":       "main",
     "prefixes":  {},
@@ -105,7 +103,6 @@ def load_data() -> dict:
         doc = _col.find_one({"_id": "main"})
         if doc:
             return doc
-        # First run — insert defaults
         _col.insert_one(_DEFAULTS.copy())
         return _DEFAULTS.copy()
     return _DEFAULTS.copy()
@@ -113,7 +110,6 @@ def load_data() -> dict:
 def save_data():
     if _col is not None:
         _col.replace_one({"_id": "main"}, data, upsert=True)
-    # If no MongoDB, data lives in memory only (acceptable for local dev)
 
 data = load_data()
 
@@ -163,11 +159,6 @@ def is_premium(guild_id: int) -> bool:
     return get_premium(guild_id) is not None
 
 def has_premium_access(ctx_or_interaction) -> bool:
-    """
-    True if:
-    - caller is OWNER_ID (Aditya) — always allowed, any server, no premium needed
-    - OR the server has an active premium subscription
-    """
     if isinstance(ctx_or_interaction, commands.Context):
         user_id  = ctx_or_interaction.author.id
         guild_id = ctx_or_interaction.guild.id if ctx_or_interaction.guild else None
@@ -175,10 +166,8 @@ def has_premium_access(ctx_or_interaction) -> bool:
         user_id  = ctx_or_interaction.user.id
         guild_id = getattr(ctx_or_interaction, "guild_id", None)
 
-    # Owner bypass — always first
     if user_id == OWNER_ID:
         return True
-    # Server premium check
     if guild_id and is_premium(guild_id):
         return True
     return False
@@ -187,8 +176,8 @@ def trial_used(guild_id: int) -> bool:
     return data["premium"].get(str(guild_id), {}).get("trial_used", False)
 
 def activate_premium(guild_id: int, activated_by: int, days, plan: str):
-    gid     = str(guild_id)
-    expires = int(time.time() + days * 86400) if days else None
+    gid      = str(guild_id)
+    expires  = int(time.time() + days * 86400) if days else None
     existing = data["premium"].get(gid, {})
     data["premium"][gid] = {
         "active":       True,
@@ -210,11 +199,120 @@ def premium_embed(title: str, description: str = "") -> discord.Embed:
     e.set_footer(text="Numexa Premium ⭐ • Made with 💜 by Aditya")
     return e
 
-PREMIUM_UPSELL = (
-    "⭐ **This is a Premium feature!**\n\n"
-    f"Start a free **{TRIAL_DAYS}-day trial** with `!trial`\n"
-    f"Or get Premium by opening a ticket in [The Devzone]({DEVZONE_INVITE})"
-)
+
+# ── "Buy Premium" upsell system ────────────────────────────────────
+
+class BuyPremiumView(discord.ui.View):
+    """
+    Shown when a server tries to use a premium feature without premium.
+    - If trial is available: green 'Start Free Trial' button (interactive) + link to ticket.
+    - If trial is used: only the ticket link button.
+    """
+    def __init__(self, show_trial: bool = True):
+        super().__init__(timeout=180)
+        # Link button always shown
+        self.add_item(discord.ui.Button(
+            label="🎟️ Buy Premium — Open Ticket",
+            style=discord.ButtonStyle.link,
+            url=TICKET_URL,
+            row=0
+        ))
+        self._show_trial = show_trial
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return True
+
+    @discord.ui.button(label="🆓 Start Free Trial", style=discord.ButtonStyle.green, row=0)
+    async def trial_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self._show_trial:
+            await interaction.response.send_message(
+                err("Your server has already used its free trial."), ephemeral=True)
+            return
+        if not interaction.guild:
+            return await interaction.response.send_message(err("Server-only."), ephemeral=True)
+        if interaction.user.id != interaction.guild.owner_id and not is_owner(interaction.user.id):
+            return await interaction.response.send_message(
+                err("Only the **server owner** can activate the trial."), ephemeral=True)
+        if is_premium(interaction.guild.id):
+            rec = get_premium(interaction.guild.id)
+            exp = f"<t:{rec['expires']}:R>" if rec.get("expires") else "never"
+            return await interaction.response.send_message(
+                err(f"This server already has Premium active (expires {exp})."), ephemeral=True)
+        if trial_used(interaction.guild.id):
+            e = discord.Embed(
+                title="⏳ Trial Already Used",
+                description=(
+                    "Your server has already used its free trial.\n\n"
+                    f"💳 [Open a ticket to buy Premium]({TICKET_URL})"
+                ),
+                color=PREMIUM_COLOR
+            )
+            v = discord.ui.View()
+            v.add_item(discord.ui.Button(
+                label="🎟️ Open Ticket", style=discord.ButtonStyle.link, url=TICKET_URL))
+            return await interaction.response.send_message(embed=e, view=v, ephemeral=True)
+
+        activate_premium(interaction.guild.id, interaction.user.id, TRIAL_DAYS, "trial")
+        expires_ts = int(time.time() + TRIAL_DAYS * 86400)
+        e = discord.Embed(
+            title="🎉 Premium Trial Activated!",
+            description=(
+                f"**{interaction.guild.name}** now has **Numexa Premium** for **{TRIAL_DAYS} days**!\n\n"
+                f"Expires: <t:{expires_ts}:R>\n\n"
+                "Use `!help` → ⭐ Premium to explore all features."
+            ),
+            color=PREMIUM_COLOR
+        )
+        # Disable the trial button after use
+        button.disabled = True
+        button.label    = "✅ Trial Activated"
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send(embed=e)
+
+
+def no_premium_embed(ctx_or_interaction) -> discord.Embed:
+    """Embed shown when a server doesn't have premium."""
+    guild_id = (
+        ctx_or_interaction.guild.id
+        if isinstance(ctx_or_interaction, commands.Context)
+        else getattr(ctx_or_interaction, "guild_id", None)
+    )
+    trial_available = guild_id and not trial_used(guild_id)
+
+    desc = (
+        "✨ **This feature requires Numexa Premium.**\n\n"
+        + (
+            f"🎁 Your server can claim a **free {TRIAL_DAYS}-day trial** — click the green button below!\n\n"
+            if trial_available else
+            "⏳ Your server has already used its free trial.\n\n"
+        )
+        + "💳 To buy Premium, open a ticket using the button below and a staff member will set it up.\n\n"
+          "*Unlocks: plot, history, matrix, step-by-step calculus, milestones, "
+          "daily problems, bookmarks & more — server-wide!*"
+    )
+    e = discord.Embed(title="⭐ Upgrade to Numexa Premium", description=desc, color=PREMIUM_COLOR)
+    e.set_footer(text="Numexa Premium ⭐ • Made with 💜 by Aditya")
+    return e
+
+
+async def send_no_premium(ctx_or_interaction):
+    """Call this in every premium-gated command when access is denied."""
+    guild_id = (
+        ctx_or_interaction.guild.id
+        if isinstance(ctx_or_interaction, commands.Context)
+        else getattr(ctx_or_interaction, "guild_id", None)
+    )
+    show_trial = bool(guild_id and not trial_used(guild_id))
+    embed = no_premium_embed(ctx_or_interaction)
+    view  = BuyPremiumView(show_trial=show_trial)
+
+    if isinstance(ctx_or_interaction, commands.Context):
+        await ctx_or_interaction.send(embed=embed, view=view, delete_after=90)
+    else:
+        try:
+            await ctx_or_interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        except discord.InteractionResponded:
+            await ctx_or_interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 
 # ──────────────────────────── SAFE EVAL ───────────────────────────
@@ -277,15 +375,17 @@ def uptime_str() -> str:
     h, rem = divmod(secs, 3600)
     m, s   = divmod(rem, 60)
     return f"{h}h {m}m {s}s"
+
 def is_active_instance() -> bool:
     """Only the newest Railway deployment responds to messages."""
     if _col is None:
-        return True  # local dev fallback
+        return True
     try:
         doc = _col.find_one({"_id": "active_instance"})
         return doc is not None and doc.get("instance_id") == INSTANCE_ID
     except Exception:
-        return True  # DB error → don't go silent
+        return True
+
 
 # ─────────────────────── HELP MENU SYSTEM ─────────────────────────
 
@@ -314,9 +414,9 @@ def _help_calculator() -> discord.Embed:
 
 def _help_calculus() -> discord.Embed:
     e = numexa_embed("📐 Calculus Commands", "Powered by SymPy — all w.r.t. `x`.")
-    e.add_field(name="`diff <expr>`",      value="Differentiate.\n```\n!diff x**3 + 2*x```",         inline=False)
-    e.add_field(name="`integrate <expr>`", value="Integrate.\n```\n!integrate x**2```",               inline=False)
-    e.add_field(name="`dsolve <eq>`",      value="Solve a differential equation.",                     inline=False)
+    e.add_field(name="`diff <expr>`",      value="Differentiate.\n```\n!diff x**3 + 2*x```",   inline=False)
+    e.add_field(name="`integrate <expr>`", value="Integrate.\n```\n!integrate x**2```",         inline=False)
+    e.add_field(name="`dsolve <eq>`",      value="Solve a differential equation.",               inline=False)
     return e
 
 def _help_settings() -> discord.Embed:
@@ -353,8 +453,8 @@ def _help_links() -> discord.Embed:
     e.add_field(name="👋 `invite`",    value=f"[Add Numexa]({INVITE_URL})",           inline=False)
     e.add_field(name="💬 `support`",   value=f"[Join The Devzone]({DEVZONE_INVITE})", inline=False)
     e.add_field(name="🧠 `dashboard`", value=f"[Web Dashboard]({DASHBOARD_URL})",     inline=False)
-    e.add_field(name="🧠 `vote`", value=f"[Vote for Numexa]({VOTE_URL})",     inline=False)
-    e.add_field(name="🧠 `review`", value=f"[Review Numexa]({REVIEW_URL})",     inline=False)
+    e.add_field(name="🗳️ `vote`",      value=f"[Vote for Numexa]({VOTE_URL})",        inline=False)
+    e.add_field(name="⭐ `review`",    value=f"[Review Numexa]({REVIEW_URL})",        inline=False)
     return e
 
 def _help_premium() -> discord.Embed:
@@ -363,17 +463,17 @@ def _help_premium() -> discord.Embed:
         description=(
             "Powerful features unlocked for your **entire server**!\n\n"
             f"🎁 **Free Trial:** `!trial` — {TRIAL_DAYS} days, one-time per server *(server owner only)*\n"
-            f"💳 **Buy Premium:** Open a ticket in [The Devzone]({DEVZONE_INVITE})\n"
+            f"💳 **Buy Premium:** [Open a ticket]({TICKET_URL}) in The Devzone\n"
             f"📊 **Check Status:** `!premium`\n\n"
             "**All commands below work for everyone once the server has Premium.**\n"
             "Non-premium servers will see a purchase prompt."
         ),
         color=PREMIUM_COLOR
     )
-    e.add_field(name="📊 `plot <expr>`",        value="Graph any function.\n```\n!plot x**2 + sin(x)```",     inline=False)
-    e.add_field(name="📝 `history`",            value="Last 10 calcs in this server.\n```\n!history```",         inline=False)
-    e.add_field(name="🧮 `matrix <op> <data>`", value="det, inv, trans, add, mul.\n```\n!matrix det 1,2|3,4```", inline=False)
-    e.add_field(name="📐 `stepdiff` / `stepint`",value="Step-by-step calculus.\n```\n!stepdiff x**3 + 2*x```",  inline=False)
+    e.add_field(name="📊 `plot <expr>`",         value="Graph any function.\n```\n!plot x**2 + sin(x)```",      inline=False)
+    e.add_field(name="📝 `history`",             value="Last 10 calcs in this server.\n```\n!history```",        inline=False)
+    e.add_field(name="🧮 `matrix <op> <data>`",  value="det, inv, trans, add, mul.\n```\n!matrix det 1,2|3,4```", inline=False)
+    e.add_field(name="📐 `stepdiff` / `stepint`", value="Step-by-step calculus.\n```\n!stepdiff x**3 + 2*x```",  inline=False)
     e.add_field(name="🔢 `setmilestone`  *(server owner)*", value="Role reward at count milestone.\n```\n!setmilestone 100 @Role```", inline=False)
     e.add_field(name="🔔 `setdaily` / `stopdaily`  *(server owner)*", value="Daily math problem at midnight UTC.\n```\n!setdaily```", inline=False)
     e.add_field(name="📌 `bookmark <save|list|use|delete>`", value="Save & recall expressions.\n```\n!bookmark save q x**2+3*x```", inline=False)
@@ -746,14 +846,14 @@ async def cmd_invite(ctx):
 
 @bot.command(name="vote")
 async def cmd_vote(ctx):
-    e = numexa_embed("� Vote for Numexa", "Click below to vote for Numexa on Top.gg!")
+    e = numexa_embed("🗳️ Vote for Numexa", "Click below to vote for Numexa on Top.gg!")
     v = discord.ui.View()
     v.add_item(discord.ui.Button(label="Vote for Numexa", style=discord.ButtonStyle.link, url=VOTE_URL))
     await ctx.send(embed=e, view=v)
 
 @bot.command(name="review")
 async def cmd_review(ctx):
-    e = numexa_embed(" Review Numexa", "Click below to review Numexa on Top.gg!")
+    e = numexa_embed("⭐ Review Numexa", "Click below to review Numexa on Top.gg!")
     v = discord.ui.View()
     v.add_item(discord.ui.Button(label="Review Numexa", style=discord.ButtonStyle.link, url=REVIEW_URL))
     await ctx.send(embed=e, view=v)
@@ -776,12 +876,12 @@ async def cmd_trial(ctx):
             title="⭐ Trial Already Used",
             description=(
                 "This server has already used its free trial.\n\n"
-                f"To get Premium, open a ticket in [The Devzone]({DEVZONE_INVITE}) after payment."
+                f"To get Premium, open a ticket after payment."
             ),
             color=PREMIUM_COLOR
         )
         v = discord.ui.View()
-        v.add_item(discord.ui.Button(label="Open Ticket", style=discord.ButtonStyle.link, url=DEVZONE_INVITE))
+        v.add_item(discord.ui.Button(label="🎟️ Open Ticket", style=discord.ButtonStyle.link, url=TICKET_URL))
         return await ctx.send(embed=e, view=v)
 
     activate_premium(ctx.guild.id, ctx.author.id, TRIAL_DAYS, "trial")
@@ -796,7 +896,7 @@ async def cmd_trial(ctx):
         color=PREMIUM_COLOR
     )
     v = discord.ui.View()
-    v.add_item(discord.ui.Button(label="View Premium Features", style=discord.ButtonStyle.link, url=DEVZONE_INVITE))
+    v.add_item(discord.ui.Button(label="View Premium Features", style=discord.ButtonStyle.link, url=TICKET_URL))
     await ctx.send(embed=e, view=v)
 
 @bot.command(name="premium")
@@ -820,13 +920,13 @@ async def cmd_premium(ctx):
         e = discord.Embed(
             title="💤 No Premium",
             description=(
-                f"Trial expired. [Open a ticket]({DEVZONE_INVITE}) to buy Premium." if used
+                f"Trial expired. [Open a ticket]({TICKET_URL}) to buy Premium." if used
                 else f"No Premium active. Start your free **{TRIAL_DAYS}-day trial** with `!trial`!"
             ),
             color=BOT_COLOR
         )
         v = discord.ui.View()
-        v.add_item(discord.ui.Button(label="Buy Premium", style=discord.ButtonStyle.link, url=DEVZONE_INVITE))
+        v.add_item(discord.ui.Button(label="🎟️ Buy Premium", style=discord.ButtonStyle.link, url=TICKET_URL))
         await ctx.send(embed=e, view=v)
 
 
@@ -887,7 +987,7 @@ async def cmd_premiumlist(ctx):
 @bot.command(name="plot")
 async def cmd_plot(ctx, *, expr: str):
     if not has_premium_access(ctx):
-        return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
+        return await send_no_premium(ctx)
     try:
         x_vals = np.linspace(-10, 10, 800)
         safe_names = {
@@ -931,7 +1031,7 @@ async def cmd_plot(ctx, *, expr: str):
 @bot.command(name="history")
 async def cmd_history(ctx):
     if not has_premium_access(ctx):
-        return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
+        return await send_no_premium(ctx)
     hist = data["history"].get(str(ctx.guild.id), [])
     if not hist:
         return await ctx.send(err("No calculation history yet. Use `!calc` to start building it."))
@@ -950,15 +1050,8 @@ async def cmd_history(ctx):
 # ── 3. Matrix Operations ──────────────────────────────────────────
 @bot.command(name="matrix")
 async def cmd_matrix(ctx, operation: str, *, data_str: str):
-    """
-    !matrix det 1,2|3,4
-    !matrix inv 1,2|3,4
-    !matrix trans 1,2|3,4
-    !matrix add 1,2|3,4 + 5,6|7,8
-    !matrix mul 1,2|3,4 * 5,6|7,8
-    """
     if not has_premium_access(ctx):
-        return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
+        return await send_no_premium(ctx)
 
     def parse_matrix(s: str):
         return sp.Matrix([[sp.sympify(v.strip()) for v in row.split(",")]
@@ -995,7 +1088,7 @@ async def cmd_matrix(ctx, operation: str, *, data_str: str):
 @bot.command(name="stepdiff")
 async def cmd_stepdiff(ctx, *, expr: str):
     if not has_premium_access(ctx):
-        return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
+        return await send_no_premium(ctx)
     try:
         sym_expr = sp.sympify(expr)
         terms    = sp.Add.make_args(sym_expr)
@@ -1013,7 +1106,7 @@ async def cmd_stepdiff(ctx, *, expr: str):
 @bot.command(name="stepint")
 async def cmd_stepint(ctx, *, expr: str):
     if not has_premium_access(ctx):
-        return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
+        return await send_no_premium(ctx)
     try:
         sym_expr = sp.sympify(expr)
         terms    = sp.Add.make_args(sym_expr)
@@ -1035,7 +1128,7 @@ async def cmd_setmilestone(ctx, count: int, role: discord.Role):
     if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
         return await ctx.send(err("Only the **server owner** can set milestones."))
     if not has_premium_access(ctx):
-        return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
+        return await send_no_premium(ctx)
     gid = str(ctx.guild.id)
     if gid not in data["counting"]:
         return await ctx.send(err("Set up a counting channel first with `!setcount`."))
@@ -1067,7 +1160,7 @@ async def cmd_setdaily(ctx):
     if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
         return await ctx.send(err("Only the **server owner** can set the daily channel."))
     if not has_premium_access(ctx):
-        return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
+        return await send_no_premium(ctx)
     data["daily"][str(ctx.guild.id)] = {"channel": ctx.channel.id, "last_sent": ""}
     save_data()
     await ctx.send(ok(f"Daily math problem will be posted in {ctx.channel.mention} every day at midnight UTC!"))
@@ -1078,8 +1171,6 @@ async def cmd_stopdaily(ctx):
         return
     if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
         return await ctx.send(err("Only the **server owner** can stop the daily problem."))
-    if not ctx.guild:
-        return
     data["daily"].pop(str(ctx.guild.id), None)
     save_data()
     await ctx.send(ok("Daily math problem stopped."))
@@ -1088,14 +1179,8 @@ async def cmd_stopdaily(ctx):
 # ── 8. Expression Bookmarks ───────────────────────────────────────
 @bot.command(name="bookmark")
 async def cmd_bookmark(ctx, action: str, name: str = None, *, expr: str = None):
-    """
-    !bookmark save <name> <expr>
-    !bookmark list
-    !bookmark use <name>
-    !bookmark delete <name>
-    """
     if not has_premium_access(ctx):
-        return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
+        return await send_no_premium(ctx)
 
     uid = str(ctx.author.id)
     data["bookmarks"].setdefault(uid, {})
@@ -1148,7 +1233,7 @@ async def cmd_botnick(ctx, *, nick: str = None):
     if ctx.author.id != ctx.guild.owner_id and not is_owner(ctx.author.id):
         return await ctx.send(err("Only the **server owner** can change my nickname."))
     if not has_premium_access(ctx):
-        return await ctx.send(embed=discord.Embed(description=PREMIUM_UPSELL, color=PREMIUM_COLOR))
+        return await send_no_premium(ctx)
     try:
         await ctx.guild.me.edit(nick=nick)
         await ctx.send(ok(f"Bot nickname set to **{nick}**." if nick else "Bot nickname reset."))
@@ -1156,15 +1241,14 @@ async def cmd_botnick(ctx, *, nick: str = None):
         await ctx.send(err("I don't have permission to change my nickname."))
 
 
-
 @bot.command(name="sync")
 async def cmd_sync(ctx):
-    """Force re-sync all slash commands (owner only)."""
     if not is_owner(ctx.author.id):
         return await ctx.send(err("Owner only."))
     await ctx.send("⏳ Syncing slash commands...")
     synced = await bot.tree.sync()
     await ctx.send(ok(f"Synced **{len(synced)}** slash commands globally."))
+
 
 # ═══════════════════════ SLASH COMMANDS ═══════════════════════════
 
@@ -1233,11 +1317,13 @@ async def slash_trial(i: discord.Interaction):
     if is_premium(i.guild.id):
         return await i.response.send_message(err("This server already has Premium."), ephemeral=True)
     if trial_used(i.guild.id):
-        return await i.response.send_message(
-            embed=discord.Embed(
-                description=f"Trial already used. [Open a ticket]({DEVZONE_INVITE}) to buy Premium.",
-                color=PREMIUM_COLOR),
-            ephemeral=True)
+        e = discord.Embed(
+            title="⏳ Trial Already Used",
+            description=f"This server has already used its free trial.\n\n💳 [Open a ticket to buy Premium]({TICKET_URL})",
+            color=PREMIUM_COLOR)
+        v = discord.ui.View()
+        v.add_item(discord.ui.Button(label="🎟️ Open Ticket", style=discord.ButtonStyle.link, url=TICKET_URL))
+        return await i.response.send_message(embed=e, view=v, ephemeral=True)
     activate_premium(i.guild.id, i.user.id, TRIAL_DAYS, "trial")
     expires_ts = int(time.time() + TRIAL_DAYS * 86400)
     e = discord.Embed(
@@ -1256,14 +1342,17 @@ async def slash_premium(i: discord.Interaction):
         e   = discord.Embed(title="⭐ Premium Active",
                             description=f"Plan: **{rec['plan'].capitalize()}** • Expires: {exp}",
                             color=PREMIUM_COLOR)
+        await i.response.send_message(embed=e, ephemeral=True)
     else:
         used = trial_used(i.guild.id)
         e    = discord.Embed(
             title="💤 No Premium",
-            description=(f"Trial expired. [Buy Premium]({DEVZONE_INVITE})" if used
+            description=(f"Trial expired. [Buy Premium]({TICKET_URL})" if used
                          else f"Start your free {TRIAL_DAYS}-day trial with `!trial`"),
             color=BOT_COLOR)
-    await i.response.send_message(embed=e, ephemeral=True)
+        v = discord.ui.View()
+        v.add_item(discord.ui.Button(label="🎟️ Buy Premium", style=discord.ButtonStyle.link, url=TICKET_URL))
+        await i.response.send_message(embed=e, view=v, ephemeral=True)
 
 @bot.tree.command(name="setprefix", description="Change the server prefix (admin only)")
 @app_commands.describe(prefix="New prefix (max 5 chars)")
@@ -1406,14 +1495,14 @@ async def slash_dashboard(i: discord.Interaction):
 
 @bot.tree.command(name="vote", description="Get the vote link")
 async def slash_vote(i: discord.Interaction):
-    e = numexa_embed("� Vote for Numexa", "Click below to vote for Numexa on Top.gg!")
+    e = numexa_embed("🗳️ Vote for Numexa", "Click below to vote for Numexa on Top.gg!")
     v = discord.ui.View()
     v.add_item(discord.ui.Button(label="Vote for Numexa", style=discord.ButtonStyle.link, url=VOTE_URL))
     await i.response.send_message(embed=e, view=v, ephemeral=True)
 
 @bot.tree.command(name="review", description="Get the review link")
 async def slash_review(i: discord.Interaction):
-    e = numexa_embed("� Review Numexa", "Click below to review Numexa on Top.gg!")
+    e = numexa_embed("⭐ Review Numexa", "Click below to review Numexa on Top.gg!")
     v = discord.ui.View()
     v.add_item(discord.ui.Button(label="Review Numexa", style=discord.ButtonStyle.link, url=REVIEW_URL))
     await i.response.send_message(embed=e, view=v, ephemeral=True)
@@ -1476,7 +1565,6 @@ async def slash_premiumlist(i: discord.Interaction):
         e.add_field(name=name, value=f"Plan: `{rec['plan']}` • Expires: {exp}", inline=False)
     await i.response.send_message(embed=e, ephemeral=True)
 
-
 @bot.tree.command(name="sync", description="Force re-sync slash commands (bot owner only)")
 async def slash_sync(i: discord.Interaction):
     if not is_owner(i.user.id):
@@ -1484,6 +1572,7 @@ async def slash_sync(i: discord.Interaction):
     await i.response.defer(ephemeral=True)
     synced = await bot.tree.sync()
     await i.followup.send(ok(f"Synced **{len(synced)}** slash commands globally."), ephemeral=True)
+
 
 # ═════════════════════════ BOT EVENTS ═════════════════════════════
 
@@ -1527,14 +1616,12 @@ async def on_command_error(ctx, error):
 # ─────────────────────────── COUNTING ─────────────────────────────
 @bot.event
 async def on_message(message):
-    # Stale Railway deployment → ignore everything
     if not is_active_instance():
         return
 
     if message.author.bot or not message.guild:
         await bot.process_commands(message)
         return
-    # ... rest unchanged
 
     # ── @Numexa mention-only → about embed ────────────────────────
     if bot.user in message.mentions and message.content.strip() in (
@@ -1678,13 +1765,11 @@ async def status_loop():
         await bot.change_presence(activity=next(statuses))
         await asyncio.sleep(30)
 
+
 @bot.event
 async def on_ready():
     global _active_instance_id
 
-    # Register this process as the active instance in MongoDB.
-    # The old Railway container will now fail is_active_instance()
-    # and silently stop handling all messages → zero duplicates.
     if _col is not None:
         try:
             _col.update_one(
@@ -1696,11 +1781,19 @@ async def on_ready():
             print(f"   Warning: instance registration failed — {e}")
     _active_instance_id = INSTANCE_ID
 
-    # ... your existing on_ready code below (synced, status_loop, etc.) unchanged
     print(f"✅ Logged in as {bot.user} ({bot.user.id})")
     print(f"   Guilds  : {len(bot.guilds)}")
     print(f"   Premium : {sum(1 for r in data['premium'].values() if r.get('active'))} active servers")
     print(f"   Prefix  : {DEFAULT_PREFIX}")
+
+    asyncio.create_task(status_loop())
+    asyncio.create_task(daily_problem_loop())
+
+    try:
+        synced = await bot.tree.sync()
+        print(f"   Synced  : {len(synced)} slash commands")
+    except Exception as e:
+        print(f"   Sync failed: {e}")
 
 
 # ──────────────────────────── RUN ─────────────────────────────────
